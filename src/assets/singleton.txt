@@ -1,0 +1,45 @@
+//region Singleton
+export interface SingletonDecOpt extends HashLike {
+    throwing?: boolean;
+}
+
+const singletonCache: Map<string, FuncLike> = new Map<string, FuncLike>();
+const _singletonConstructor = (clazz: ClassReflectLike): FuncLike => {
+    return new Proxy(clazz.creator, {
+        construct(clz, args): FuncLike {
+            // console.log(`inir ${decorator.fnc.name}`);
+            const key = fqn.get(clazz.creator);
+            if (!singletonCache.has(key)) {
+                console.log(`Constructing ${key}`);
+                singletonCache.set(key, Reflect.construct(clz, args));
+            }
+            return singletonCache.get(key);
+        }
+    });
+}
+
+export function Singleton(val: _SingletonI | boolean = true): ClassDecorator {
+    return <ClassDecorator>((trg) => {
+        const ins = dxSingleton.fork([trg]);
+        const obj = ins.assigned.initWith(val, BooleanType.cast) as _SingletonI;
+        ins.target.appendToCurrent(obj);
+
+        const clazz = ins.target as ReflectorClass;
+        const fnc = (clazz.instance.fnc as unknown as InjectF);
+        console.log('Singleton: ' + clazz.instance.className);
+        console.log('Singleton: ' + fnc.ins);
+        if (fnc.ins === undefined) {
+            fnc.ins = () => {
+                console.log('ins ' + fnc.name);
+                if (!singletonCache.has(fnc.name)) {
+                    return _singletonConstructor(clazz);
+                }
+                return singletonCache.get(fnc.name);
+            }
+        }
+        return _singletonConstructor(clazz);
+    });
+}
+
+export const dxSingleton: DecoId<_SingletonI> = DecoId.identify(Singleton, 'throwing').clazz();
+//endregion Singleton

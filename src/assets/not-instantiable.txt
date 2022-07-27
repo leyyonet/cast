@@ -1,0 +1,31 @@
+//region NotInstantiable
+export interface NotInstantiableI extends DecoValueI {
+    throwing?: boolean;
+}
+
+const _notInstantiableConstructor = (clazz: ReflectorClass): TFunction0 => {
+    return new Proxy(clazz.instance.fnc, {
+        construct(clz, args) {
+            const val = dxSingleton.firstValueByClass(clz.name);
+            if (val.throwing) {
+                throw new Error(`NotInstantiable class:${clz.name} with: ${JSON.stringify(args)}`);
+            }
+            return null;
+        }
+    });
+}
+
+export function NotInstantiable(val: NotInstantiableI | boolean = true): ClassDecorator {
+    return <ClassDecorator>((trg: TFunction0) => {
+        const ins = dxNotInstantiable.fork([trg]);
+        const obj = ins.target.initWith(val, BooleanType.cast) as NotInstantiableI;
+        ins.target.appendToCurrent(obj);
+        const clazz = ins.target as ReflectorClass;
+        console.log('NotInstantiable: ' + clazz.instance.className);
+        console.log('NotInstantiable: ' + (clazz.instance.fnc as unknown as InjectF).ins);
+        return _notInstantiableConstructor(clazz);
+    });
+}
+
+export const dxNotInstantiable: DecoId<NotInstantiableI> = DecoId.identify(NotInstantiable, 'throwing').clazz();
+//endregion NotInstantiable

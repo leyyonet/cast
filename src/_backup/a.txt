@@ -1,0 +1,71 @@
+export type CastSeverity = 'silent'|'log'|'error';
+export type CastChildSeverity = 'error'|'ignore'|'asNull';
+export interface CastOpt extends RecLike {
+    $severity?: CastSeverity; // severity > inherited from parent
+    $name?: CastFieldName; // title > appended from parent
+}
+export interface CastOptOne<T = unknown> extends CastOpt {
+    def?: T;
+    mandatory?: boolean;
+}
+export interface CastOptChild extends CastOptOne {
+    severity?: CastChildSeverity;
+    ignoreNull?: boolean;
+}
+
+// noinspection JSUnusedGlobalSymbols
+export type CastFindIndex<T = unknown> = (item: T) => number;
+export interface CastOptArray<V extends CastOpt = CastOpt> extends CastOpt {
+    asNull?: boolean;
+    canBeObjectValues?: boolean;
+    delimited?: boolean|string; //true[comma] or delimiter
+    fromJson?: boolean;
+    unique?: boolean|CastFindIndex; // true[==] or function
+    removeDuplicated?: boolean;
+    minItems?: number;
+    maxItems?: number;
+    cropMaxItems?: boolean;
+    $childValue?: CastOptChild & V;
+}
+// noinspection JSUnusedGlobalSymbols
+export interface CastOptHash<V extends CastOpt = CastOpt, K extends CastOpt = CastOpt> extends CastOpt {
+    asNull?: boolean;
+    fromJson?: boolean;
+    canBeArray?: boolean;
+    sortedKeys?: boolean;
+    minKeys?: number;
+    maxKeys?: number;
+    cropMaxKeys?: boolean;
+
+    $childValue?: CastOptChild & V;
+    $childKey?: CastOptChild & K;
+}
+
+// noinspection JSUnusedGlobalSymbols
+// todo
+export interface CastPrimitiveLike<T = unknown, O extends CastOpt = CastOpt> {
+    is(value: unknown, opt?: O): boolean;
+    isHash(value: unknown, opt?: RecLike & O): boolean;
+    isArray(value: unknown, opt?: RecLike & O): boolean;
+    innerCast(value: unknown, opt?: O): T | null;
+    cast(value: unknown, opt?: O): T | null;
+    castArray(value: unknown, opt?: RecLike & O): Array<T>;
+    castHash(value: unknown, opt?: RecLike & O): RecLike<T>;
+    empty(value: unknown): boolean;
+}
+
+/*
+*             it(`Validate result`, (done) => {
+                callback.pair.runAsync('Game', 'A').then((response) => {
+                    if ((response as GamePair).id === 'A') {
+                        done();
+                    } else {
+                        done(new Error('Result is different: ' + JSON.stringify(response)));
+                    }
+                })
+                    .catch((err) => {
+                        done(err);
+                    });
+            });
+
+* */
