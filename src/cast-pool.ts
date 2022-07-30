@@ -1,11 +1,10 @@
 import {
     ArraySome,
-    ClassLike,
     ClassOrName,
     DeveloperException,
     F_FIELD,
     FuncLike,
-    leyyo, LEYYO_NAME,
+    leyyo,
     ObjectLike, TypeFnLambda,
     TypeOpt
 } from "@leyyo/core";
@@ -20,9 +19,10 @@ import {
     CastPoolLike,
     CastTransfer
 } from "./index-types";
-import {BASE_NAME, CAST_KEY, COMPONENT_NAME, FQN_NAME} from "./internal-component";
+import {CAST_KEY, COMPONENT_NAME, FQN_NAME} from "./internal-component";
 
 
+// noinspection JSUnusedGlobalSymbols
 @Fqn(...FQN_NAME)
 export class CastPool extends AbstractCallback<CastLike> implements CastPoolLike {
     // region properties
@@ -263,7 +263,7 @@ export class CastPool extends AbstractCallback<CastLike> implements CastPoolLike
     }
     ly_defaultSetter(dto: CastTransfer): void {
         // this.LOG.warn('ly_defaultSetter', {clazz: fqn.name(dto.target), property: dto.property});
-        this.ly_refactorProperty(dto.target, dto.property, dto.opt, (v, opt) => {
+        this.ly_refactorProperty(dto.target, dto.property, dto.opt, v => {
             new DeveloperException('not-defined-setter', {clazz: fqn.name(dto.target), field: dto.property, type: dto.clazz}).with(this).log();
             return v;
         });
