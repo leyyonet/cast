@@ -1,0 +1,67 @@
+// @Generic('map<language, number>')
+// @Generic({map: ['language', 'number']})
+
+// @Generic('record<language, number>')
+// @Generic({record: ['language', 'number']})
+
+// @Generic('array<number>')
+// @Generic({array: ['number']})
+// @Generic(['number'])
+
+// @Generic('set<number>')
+// @Generic({set: ['number']})
+
+// @Generic('Pagination<User,PageOffset>')
+// @Generic({Pagination: ['User','PageOffset']})
+
+
+// export function GenericAble2(min: number, max?: number, ...aliases: Array<string>): ClassDecorator {
+//     const id = decoRepo.identify(GenericAble, {clazz: true});
+//     return (target: unknown) => {
+//         const fnc = target['castGen'] as GenericLambda;
+//         const name = fqnHandler.get(target);
+//         if (typeof fnc !== 'function') {
+//             throw new DeveloperException('class.has.not.method', {name, method: 'castGen'}).withHolder(this);
+//         }
+//         if (fnc.length < 2) {
+//             throw new DeveloperException('insufficient.method.params', {name, method: 'castGen', min: 2}).withHolder(this);
+//         }
+//         generic.addGen(fnc, {min, max}, name, ...aliases);
+//         id.fork([target]).set({min, max, aliases});
+//     };
+// }
+
+
+// region Cast2
+export function Cast2(type: CastName): PropertyDecorator {
+    return function(target: Object, propertyKey: string) {
+        const getter = function() {
+            const rec = Object.getOwnPropertyDescriptor(this, CAST_KEY);
+            if (rec.value) {
+                return rec.value[propertyKey];
+            }
+            return undefined;
+        };
+        const setter = function(newVal: string) {
+            let rec = Object.getOwnPropertyDescriptor(this, CAST_KEY);
+            if (!rec.value) {
+                Object.defineProperty(this, CAST_KEY, {
+                    enumerable: false,
+                    configurable: false,
+                    value: {},
+                });
+                rec = Object.getOwnPropertyDescriptor(this, CAST_KEY);
+            }
+            rec.value[propertyKey] = leyyo.primitive.text(newVal);
+        };
+        Object.defineProperty(target, propertyKey, {
+            configurable: true,
+            enumerable: true,
+            get: getter,
+            set: setter
+        });
+        cast2Id.fork(target, propertyKey).set({type});
+    }
+}
+const cast2Id = reflectPool.identify(Cast2, {field: true, notMultiple: true})
+// endregion Cast2

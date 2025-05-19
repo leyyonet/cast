@@ -44,11 +44,11 @@ export interface CastOptHash<V extends CastOpt = CastOpt, K extends CastOpt = Ca
 // noinspection JSUnusedGlobalSymbols
 // todo
 export interface CastPrimitiveLike<T = unknown, O extends CastOpt = CastOpt> {
-    is(value: unknown, opt?: O): boolean;
+    is(value: unknown): boolean;
     isHash(value: unknown, opt?: RecLike & O): boolean;
     isArray(value: unknown, opt?: RecLike & O): boolean;
     innerCast(value: unknown, opt?: O): T | null;
-    cast(value: unknown, opt?: O): T | null;
+    cast(value: unknown): T | null;
     castArray(value: unknown, opt?: RecLike & O): Array<T>;
     castHash(value: unknown, opt?: RecLike & O): RecLike<T>;
     empty(value: unknown): boolean;
