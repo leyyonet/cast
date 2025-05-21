@@ -1,4 +1,4 @@
-import { decoratorPool, Fqn } from '@leyyo/core';
+import {decoratorPool, Fqn, lifecycle} from '@leyyo/core';
 import { $descriptor, $dev, $is, $repo, ClassLike } from '@leyyo/common';
 
 import { CastFetchLike } from './index.types';
@@ -32,6 +32,19 @@ export class CastFetch implements CastFetchLike {
 
     constructor(private pool: CastPoolLike) {
         this.assignedPointers = $repo.newSet(FQN, 'assignedPointers');
+
+        lifecycle.onInitialize(FQN, () => this.initialize())
+            .before('leyyo.http-api')
+            .before('leyyo.http-client')
+            .before('leyyo.validator')
+            .before('leyyo.pipe')
+            .before('leyyo.middleware');
+        lifecycle.onProcess(FQN, () => this.process())
+            .before('leyyo.http-api')
+            .before('leyyo.http-client')
+            .before('leyyo.validator')
+            .before('leyyo.pipe')
+            .before('leyyo.middleware');
     }
 
     analyse(pointer: CastPointer): CastAnalyseType {

@@ -58,6 +58,7 @@
   },
   "dependencies": {
     "@leyyo/common": "file:../common",
-    "@leyyo/core": "file:../core"
+    "@leyyo/core": "file:../core",
+    "@leyyo/injection": "file:../injection"
   }
 }
