@@ -21,5 +21,3 @@ const deco = decoratorPool
         $assert.arrayOptional(p.values, () => $dev.desc(ins, { field: 'values' }));
         ins.set(p);
     });
-
-// castPool.union.addDiscriminator(clazz, field, values);

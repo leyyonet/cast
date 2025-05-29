@@ -1,19 +1,17 @@
-import {fqnHandler} from '@leyyo/core';
-import { $dev, Arr, ClassLike, Func, List } from '@leyyo/common';
+import { $dev, ClassLike, List } from '@leyyo/common';
 
 import { CastDiscoverLike } from './index.types';
-import {CastName, CastNamePlain, CastPoolLike} from '../pool';
-import { CastPointer } from '../basic';
-import {FQN} from "../internal";
-import {CastTokenized} from "../tokenizer";
+import { CastBase, CastName, CastNamePlain, CastPoolLike } from '../pool';
+import { CastClass } from '../basic';
+import { FQN } from '../internal';
+import { CastTokenized } from '../tokenizer';
+import { Fqn } from '@leyyo/core';
 
+@Fqn(FQN)
 export class CastDiscover implements CastDiscoverLike {
-    protected readonly _CAST_FUNCTIONS = ['cast', 'doc'] as Array<keyof CastPointer>;
-    protected readonly _GEN_FUNCTIONS = ['castGen', 'docGen'] as Array<keyof CastPointer>;
-
     constructor(private pool: CastPoolLike) {}
 
-    find(clazz: CastName, required?: boolean): CastPointer {
+    find(clazz: CastName, required?: boolean): CastClass {
         switch (typeof clazz) {
             case 'string':
                 return this.findWithString(clazz);
@@ -39,35 +37,36 @@ export class CastDiscover implements CastDiscoverLike {
                         case 2:
                             return this.findWithShortcutRecord(clazz[0], clazz[1]);
                         default:
-                            throw $dev.invalidError({
-                                issue: 'invalid.generics.array.pattern',
+                            throw $dev.developerError2(FQN, 100, {
+                                message: 'Invalid generics array pattern',
                                 value: clazz,
-                                where: 'leyyo.cast.CastPool',
+                                where: `${FQN}.CastDiscover`,
                                 method: 'find',
                             });
                     }
                 }
-                const status = this.pool.fetch.analyse(clazz as CastPointer);
+                const status = this.pool.fetch.analyse(clazz as CastClass);
                 switch (status) {
-                    case 'type-instance':
-                    case 'type-static':
-                        return this.findWithNative(clazz as CastPointer);
+                    case 'basic-instance':
+                    case 'basic-static':
+                        return this.findWithNative(clazz as CastClass);
                     default:
-                        throw $dev.invalidError({
-                            issue: 'invalid.analysis',
+                        throw $dev.developerError2(FQN, 100, {
+                            message: 'Class is not a cast class',
                             value: clazz,
+                            where: `${FQN}.CastDiscover`,
                             field: 'status',
                             status,
-                            where: 'leyyo.cast.CastPool',
                             method: 'find',
                         });
                 }
             default:
                 if (required) {
-                    throw $dev.invalidError({
-                        issue: 'invalid.casting',
+                    throw $dev.developerError2(FQN, 100, {
+                        message: 'Invalid class name',
                         value: clazz,
-                        where: 'leyyo.cast.CastPool',
+                        type: typeof clazz,
+                        where: `${FQN}.CastDiscover`,
                         method: 'find',
                     });
                 }
@@ -79,36 +78,41 @@ export class CastDiscover implements CastDiscoverLike {
         return this.find(clazz, true).cast(value);
     }
 
-    private findWithString(clazz: string): CastPointer {
-        return this.buildPointer(this.pool.tokenizer.parse(clazz, true));
+    private findWithString(clazz: string): CastClass {
+        return this.build(this.pool.tokenizer.parse(clazz, true))?.value?.clazz;
     }
 
-    private findWithSystem(clazz: ClassLike): CastPointer {
-        return this.buildPointer(this.pool.tokenizer.parse(clazz, true));
+    private findWithSystem(clazz: ClassLike): CastClass {
+        return this.build(this.pool.tokenizer.parse(clazz, true))?.value?.clazz;
     }
 
-    private findEmptyGenerics(clazz: ClassLike): CastPointer {
-        return this.buildPointer({ base: this.pool.tokenizer.className(clazz), children: [{ base: 'Any' }] });
+    private findEmptyGenerics(clazz: ClassLike): CastClass {
+        return this.build({ base: this.pool.tokenizer.className(clazz), children: [{ base: 'Any' }] })?.value?.clazz;
     }
 
-    private findWithShortcutArray(clazz: CastNamePlain): CastPointer {
+    private findWithShortcutArray(clazz: CastNamePlain): CastClass {
         switch (typeof clazz) {
             case 'string':
             case 'object':
             case 'function':
-                return this.buildPointer({ base: 'Array', kinds: ['type'], children: [{ base: this.pool.tokenizer.className(clazz) }] });
+                return this.build({
+                    base: 'Array',
+                    kind: 'basic',
+                    children: [{ base: this.pool.tokenizer.className(clazz) }],
+                })?.value?.clazz;
             default:
-                throw $dev.invalidError({
-                    issue: 'invalid.generics.pattern',
+                throw $dev.developerError2(FQN, 100, {
+                    message: 'Invalid class name',
+                    value: clazz,
                     type: typeof clazz,
                     expected: ['string', 'object', 'function'],
-                    where: 'leyyo.cast.CastPool',
+                    where: `${FQN}.CastDiscover`,
                     method: 'findWithShortcutArray',
                 });
         }
     }
 
-    private findWithShortcutRecord(keyClass: CastNamePlain, valueClass: CastNamePlain): CastPointer {
+    private findWithShortcutRecord(keyClass: CastNamePlain, valueClass: CastNamePlain): CastClass {
         let key: string;
         let value: string;
 
@@ -119,12 +123,13 @@ export class CastDiscover implements CastDiscoverLike {
                 key = this.pool.tokenizer.className(keyClass);
                 break;
             default:
-                throw $dev.invalidError({
-                    issue: 'invalid.generics.pattern',
+                throw $dev.developerError2(FQN, 100, {
+                    message: 'Invalid key class for map',
+                    value: keyClass,
                     type: typeof keyClass,
                     expected: ['string', 'object', 'function'],
-                    where: 'leyyo.cast.CastPool',
-                    method: 'findWithShortcutArray',
+                    where: `${FQN}.CastDiscover`,
+                    method: 'findWithShortcutRecord',
                 });
         }
         switch (typeof valueClass) {
@@ -134,72 +139,56 @@ export class CastDiscover implements CastDiscoverLike {
                 value = this.pool.tokenizer.className(valueClass);
                 break;
             default:
-                throw $dev.invalidError({
-                    issue: 'invalid.generics.pattern',
+                throw $dev.developerError2(FQN, 100, {
+                    message: 'Invalid key class for map',
+                    value: valueClass,
                     type: typeof valueClass,
                     expected: ['string', 'object', 'function'],
-                    where: 'leyyo.cast.CastPool',
-                    method: 'findWithShortcutArray',
+                    where: `${FQN}.CastDiscover`,
+                    method: 'findWithShortcutRecord',
                 });
         }
-        return this.buildPointer(this.pool.tokenizer.parse(`Record<${key},${value}>`));
+        return this.build(this.pool.tokenizer.parse(`Record<${key},${value}>`))?.value?.clazz;
     }
 
-    copy(source: unknown, target: Func | ClassLike): boolean {
-        if (source) {
-            let copied = false;
-            [this._CAST_FUNCTIONS, this._GEN_FUNCTIONS].forEach((functions) => {
-                functions.forEach((fn) => {
-                    if (typeof source[fn] === 'function') {
-                        // @ts-ignore
-                        target[fn] = (...a: Arr) => source[fn](...a);
-                        copied = true;
-                    }
-                });
-            });
-            return copied;
-        }
-        return false;
-    }
-
-    private findWithNative(clazz: CastPointer): CastPointer {
+    private findWithNative(clazz: CastClass): CastClass {
         if (this.pool.depot.has(clazz)) {
             return clazz;
         }
 
         const status = this.pool.fetch.analyse(clazz);
         switch (status) {
-            case 'type-instance':
-            case 'type-static':
+            case 'basic-instance':
+            case 'basic-static':
                 const tokenized = this.pool.tokenizer.parse(clazz, true);
-                this.pool.fetch.save(clazz, tokenized, [], ['type', 'from-native'], {});
+                const base = this.pool.fetch.save(clazz, { tokenized });
+                base.value.tags.push('from-native');
                 return clazz;
             default:
                 throw $dev.developerError2(FQN, 100, {
-                    message: 'Invalid cast class',
-                    kind: 'type',
-                    class: fqnHandler.get(clazz),
-                    where: 'leyyo.cast.CastPool',
+                    message: 'Class is not a cast class',
+                    value: clazz,
+                    where: `${FQN}.CastDiscover`,
+                    field: 'status',
+                    status,
                     method: 'find',
                 });
         }
     }
 
-    buildPointer(tokenized: CastTokenized): CastPointer {
+    build(tokenized: CastTokenized): CastBase {
         const base = this.pool.depot.get(this.pool.tokenizer.stringify(tokenized));
         if (base) {
-            return base.value;
+            return base;
         }
-
-        if (tokenized.kinds.includes('generics')) {
-            return this.pool.generics.buildPointer(tokenized);
+        switch (tokenized.kind) {
+            case 'generics':
+                return this.pool.generics.build(tokenized);
+            case 'union':
+                return this.pool.union.build(tokenized);
+            case 'tuple':
+                return this.pool.tuple.build(tokenized);
         }
-        if (tokenized.kinds.includes('union')) {
-            return this.pool.union.buildPointer(tokenized);
-        }
-        if (tokenized.kinds.includes('tuple')) {
-            return this.pool.tuple.buildPointer(tokenized);
-        }
-        return this.pool.type.buildPointer(tokenized);
+        return this.pool.basic.build(tokenized);
     }
 }

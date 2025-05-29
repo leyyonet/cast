@@ -1,9 +1,11 @@
 import { Fqn, fqnHandler } from '@leyyo/core';
-import {$assert, $dev, $log} from '@leyyo/common';
+import { $assert, $descriptor, $dev, $log } from '@leyyo/common';
 import { FQN } from '../internal';
 import { CastToken, CastTokenized, CastTokenizedInside, CastTokenizerLike, CastTokenType } from './index.types';
-import {CastKind, CastNamePlain, CastPoolLike} from '../pool';
+import { CastKind, CastNamePlain, CastPoolLike } from '../pool';
 import { COMMA, GENERIC_BEGIN, GENERIC_END, PIPE, SPACE, TUPLE_BEGIN, TUPLE_END } from './index.constants';
+import { CastClass } from '../basic';
+import { CastTokenizedSign } from '../index.symbols';
 
 // noinspection Annotator
 @Fqn(FQN)
@@ -23,13 +25,13 @@ export class CastTokenizer implements CastTokenizerLike {
     }
 
     protected _tokens(text: string): Array<CastToken> {
-        $assert.text(text, () => $dev.opt({where: `${FQN}.CastTokenizer`, field: 'text'}));
+        $assert.text(text, () => $dev.opt({ where: `${FQN}.CastTokenizer`, field: 'text' }));
 
         let collected = '';
         let index = 0;
         const tokens = [] as Array<CastToken>;
         while (index < text.length) {
-            const chr = text[0];
+            const chr = text[index];
             switch (chr) {
                 case SPACE:
                     break;
@@ -61,8 +63,15 @@ export class CastTokenizer implements CastTokenizerLike {
         return tokens;
     }
 
-    tokenize(text: string): CastTokenized {
+    saveSign(clazz: CastClass, tokenized: CastTokenized): void {
+        $descriptor.save(clazz, CastTokenizedSign, tokenized);
+    }
 
+    getSign(clazz: CastClass): CastTokenized {
+        return $descriptor.getValue<CastTokenized>(clazz, CastTokenizedSign);
+    }
+
+    tokenize(text: string): CastTokenized {
         const result = { children: [] } as CastTokenizedInside;
         const tokens = this._tokens(text);
         if (
@@ -73,7 +82,7 @@ export class CastTokenizer implements CastTokenizerLike {
             if (tokens.length === 1) {
                 return {
                     base: fqnHandler.normalizeName(tokens[0].value),
-                    kinds: ['type'],
+                    kind: 'basic',
                 };
             }
             throw $dev.developerError2(FQN, 100, { message: 'Invalid basic type', tokens });
@@ -90,8 +99,8 @@ export class CastTokenizer implements CastTokenizerLike {
             switch (token.type) {
                 case 'value':
                     current.base = fqnHandler.normalizeName(token.value);
-                    if (!Array.isArray(current.kinds)) {
-                        current.kinds = ['type'];
+                    if (!current.kind) {
+                        current.kind = 'basic';
                     }
                     break;
                 case 'comma':
@@ -111,14 +120,14 @@ export class CastTokenizer implements CastTokenizerLike {
                         const child = {
                             base: current.base,
                             children: [...current.children],
-                            kinds: [...current.kinds],
+                            kind: current.kind,
                             parent: current,
                         } as CastTokenizedInside;
 
                         delete current.base;
                         delete current.children;
                         current.children = [child];
-                        current.kinds = ['union'];
+                        current.kind = 'union';
 
                         current.children.push({ children: [], parent: current });
                         current = current.children[current.children.length - 1];
@@ -131,7 +140,7 @@ export class CastTokenizer implements CastTokenizerLike {
                     if (!current.base) {
                         throw new Error('Absent base - generics');
                     }
-                    current.kinds = ['generics'];
+                    current.kind = 'generics';
                     current.children.push({ children: [], parent: current });
                     current = current.children[current.children.length - 1];
 
@@ -157,12 +166,12 @@ export class CastTokenizer implements CastTokenizerLike {
                         const child = {
                             base: current.base,
                             children: [...current.children],
-                            kinds: [...current.kinds],
+                            kind: current.kind,
                             parent: current,
                         } as CastTokenizedInside;
 
                         current.children = [child];
-                        current.kinds = ['generics'];
+                        current.kind = 'generics';
                         current.base = 'Array';
 
                         if (current.parent) {
@@ -177,7 +186,7 @@ export class CastTokenizer implements CastTokenizerLike {
                             throw new Error('Unexpected base - tuple');
                         }
 
-                        current.kinds = ['tuple'];
+                        current.kind = 'tuple';
                         current.children.push({ children: [], parent: current });
                         current = current.children[current.children.length - 1];
 
@@ -225,20 +234,21 @@ export class CastTokenizer implements CastTokenizerLike {
             delete tokenized.children;
         }
         this._addRemove(tokenized, 'base');
-        this._addRemove(tokenized, 'kinds');
+        this._addRemove(tokenized, 'kind');
         this._addRemove(tokenized, 'children');
 
         return tokenized;
     }
 
     clearKinds(tokenized: CastTokenized): void {
-        if (tokenized.kinds !== undefined) {
-            delete tokenized.kinds;
+        if (tokenized.kind !== undefined) {
+            delete tokenized.kind;
         }
         if (Array.isArray(tokenized.children)) {
             tokenized.children.forEach((token) => this.clearKinds(token));
         }
     }
+
     className(clazz: CastNamePlain): string {
         switch (typeof clazz) {
             case 'string':
@@ -275,8 +285,7 @@ export class CastTokenizer implements CastTokenizerLike {
         let text: string;
         if (typeof clazz === 'string' && !check) {
             text = fqnHandler.normalizeName(clazz).split(' ').join('');
-        }
-        else {
+        } else {
             text = this.className(clazz);
         }
         if (text.includes('<') || text.includes('|') || text.includes('[')) {
@@ -284,9 +293,10 @@ export class CastTokenizer implements CastTokenizerLike {
         }
         return {
             base: text,
-            kinds: ['type'],
+            kind: 'basic',
         };
     }
+
     parseCleared(clazz: CastNamePlain, check?: boolean): CastTokenized {
         const tokenized = this.parse(clazz, check);
         this.clearKinds(tokenized);
@@ -294,18 +304,16 @@ export class CastTokenizer implements CastTokenizerLike {
     }
 
     stringify(tokenized: CastTokenized): string {
-        if (tokenized.kinds.includes('generics')) {
-            return `${tokenized.base}<${tokenized.children.map((c) => this.stringify(c)).join(', ')}>`;
-        }
-        if (tokenized.kinds.includes('union')) {
-            return tokenized.children.map((c) => this.stringify(c)).join(' | ');
-        }
-        if (tokenized.kinds.includes('tuple')) {
-            return `[${tokenized.children.map((c) => this.stringify(c)).join(', ')}]`;
+        switch (tokenized.kind) {
+            case 'generics':
+                return `${tokenized.base}<${tokenized.children.map((c) => this.stringify(c)).join(', ')}>`;
+            case 'union':
+                return tokenized.children.map((c) => this.stringify(c)).join(' | ');
+            case 'tuple':
+                return `[${tokenized.children.map((c) => this.stringify(c)).join(', ')}]`;
         }
         return tokenized.base;
     }
-
 }
 
 // Array<Customer>

@@ -1,10 +1,11 @@
-import { CastPointer } from '../basic';
-import {CastTokenized} from "../tokenizer";
-import {EnumLiteral, EnumMap} from "../../../common";
-import {ClassLike} from "@leyyo/common";
+import { EnumLiteral, EnumMap } from '../../../common';
+import { ClassLike } from '@leyyo/common';
+import { CastBase } from '../pool';
 
 export interface CastEnumLike {
     canBe(clazz: CastEnumName): boolean;
-    buildPointer(clazz: CastEnumName): CastPointer;
+
+    build(clazz: CastEnumName): CastBase;
 }
+
 export type CastEnumName = string | ClassLike | EnumLiteral | EnumMap;

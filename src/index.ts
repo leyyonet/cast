@@ -6,6 +6,7 @@ export * from './fetch';
 export * from './generics';
 export * from './object';
 export * from './pool';
+export * from './pending';
 export * from './refactor';
 export * from './tokenizer';
 export * from './tuple';

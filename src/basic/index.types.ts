@@ -1,21 +1,25 @@
-import { ClassLike, Func } from '@leyyo/common';
-import { CastDocLambda, CastIsLambda, CastLambda } from '../pool';
-import { CastGenericsLambda, CastGenericsDocLambda } from '../generics';
-import {CastTokenized} from "../tokenizer";
+import { ClassLike } from '@leyyo/common';
+import { CastBase, CastDocLambda, CastIsLambda, CastLambda, CastTag } from '../pool';
+import { CastGenericsDocLambda, CastGenericsLambda } from '../generics';
+import { CastTokenized } from '../tokenizer';
+import { DiscriminatorOpt } from '../decorators';
+import { FqnNaming } from '../../../core';
 
-
-export interface CastExtension {
+export interface CastValue {
+    clazz: CastClass;
     tokenized: CastTokenized;
-    hash: string;
-    names: Array<string>;
-    gen?: CastExtensionGenerics;
+    generics?: CastExtensionGenerics;
+    tags?: Array<CastTag>;
+    naming?: FqnNaming;
+    discriminator?: DiscriminatorOpt;
 }
+
 export interface CastExtensionGenerics {
     min: number;
     max: number;
 }
 
-export interface CastPointer extends ClassLike {
+export interface CastClass extends ClassLike {
     priority?: CastPriority;
 
     is?: CastIsLambda;
@@ -28,18 +32,17 @@ export interface CastPointer extends ClassLike {
 
 export type CastPriorityLambda = (value: any) => boolean;
 export type CastPriorityLevel = 1 | 2 | 3 | 4 | 5 | 99; // min, high, mid, low, min, else
-export interface CastPriority {
+export type CastBasicType = 'string' | 'number' | 'boolean' | 'bigint' | 'object' | 'array' | 'any';
+
+export interface CastPriority extends CastBasicProp<CastPriorityLevel> {
     is?: CastPriorityLambda;
-    string?: CastPriorityLevel;
-    number?: CastPriorityLevel;
-    boolean?: CastPriorityLevel;
-    bigint?: CastPriorityLevel;
-    object?: CastPriorityLevel;
-    array?: CastPriorityLevel;
-    any?: CastPriorityLevel;
-    instance?: Array<[ClassLike | string | Func, CastPriorityLevel]>;
+    instance?: Array<[ClassLike, CastPriorityLevel]>;
 }
 
+export type CastBasicProp<T> = {
+    [key in CastBasicType]?: T;
+};
+
 export interface CastBasicLike {
-    buildPointer(tokenized: CastTokenized): CastPointer;
+    build(tokenized: CastTokenized): CastBase;
 }

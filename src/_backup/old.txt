@@ -26,7 +26,7 @@
 //         if (fnc.length < 2) {
 //             throw new DeveloperException('insufficient.method.params', {name, method: 'castGen', min: 2}).withHolder(this);
 //         }
-//         generic.addGen(fnc, {min, max}, name, ...aliases);
+//         generics.addGen(fnc, {min, max}, name, ...aliases);
 //         id.fork([target]).set({min, max, aliases});
 //     };
 // }

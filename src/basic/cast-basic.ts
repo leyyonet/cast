@@ -1,23 +1,26 @@
 import { Fqn } from '@leyyo/core';
-import { $log } from '@leyyo/common';
 import { FQN } from '../internal';
-import { CastBasicLike, CastPointer } from './index.types';
-import { CastPoolLike } from '../pool';
+import { CastBasicLike } from './index.types';
+import { CastBase, CastPoolLike } from '../pool';
 import { CastTokenized } from '../tokenizer'; // noinspection Annotator
 
 // noinspection Annotator
 @Fqn(FQN)
 export class CastBasic implements CastBasicLike {
-    private readonly logger = $log.create(CastBasic);
-
     constructor(protected pool: CastPoolLike) {}
 
-    buildPointer(tokenized: CastTokenized): CastPointer {
+    build(tokenized: CastTokenized): CastBase {
+        if (!tokenized.base) {
+            return undefined;
+        }
         if (this.pool.depot.has(tokenized.base)) {
-            return this.pool.depot.get(tokenized.base).value;
+            return this.pool.depot.get(tokenized.base);
         }
         if (this.pool.enum.canBe(tokenized.base)) {
-            return this.pool.enum.buildPointer(tokenized.base);
+            return this.pool.enum.build(tokenized.base);
+        }
+        if (!this.pool.pending.has(tokenized)) {
+            this.pool.pending.queue(tokenized, (t) => this.build(t));
         }
         return undefined;
     }

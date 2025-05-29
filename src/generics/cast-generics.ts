@@ -1,15 +1,14 @@
-import { Fqn, fqnHandler, nameHandler } from '@leyyo/core';
-import { $log, Dict } from '@leyyo/common';
+import { Fqn, fqnHandler, nameHandler, reflectionPool } from '@leyyo/core';
 import { FQN } from '../internal';
 import { CastGenericsLike } from './index.types';
-import { CastApiDocResponse, CastPoolLike } from '../pool';
-import { CastPointer } from '../basic';
-import {CastTokenized} from "../tokenizer";
+import { CastBase, CastDocCallback, CastDocResponse, CastPoolLike } from '../pool';
+import { CastClass } from '../basic';
+import { CastTokenized } from '../tokenizer';
 
 @Fqn(FQN)
 export class CastGenerics implements CastGenericsLike {
     // region properties
-    private readonly logger = $log.create(CastGenerics);
+    private counter: number = 0;
 
     // endregion properties
 
@@ -17,41 +16,50 @@ export class CastGenerics implements CastGenericsLike {
 
     // region custom
 
-    buildPointer(tokenized: CastTokenized): CastPointer {
+    build(tokenized: CastTokenized): CastBase {
         const encoded = this.pool.tokenizer.stringify(tokenized);
-        const base = this.pool.depot.get(encoded);
+        let base = this.pool.depot.get(encoded);
         if (base) {
-            return base.value;
+            return base;
         }
-        const children = tokenized.children.map((child) => this.pool.discover.buildPointer(child));
-        if (this.pool.depot.has(tokenized.base)) {
-            const base = this.pool.depot.get(tokenized.base);
-            const pointerBase = base.value;
-
-            const clz = class AbstractGenerics {
-                static priority = pointerBase.priority;
-                static tokenized = tokenized;
-
-                static cast(value: unknown): unknown {
-                    return pointerBase.castGen(children, value);
-                }
-
-                static is(value: unknown) {
-                    return pointerBase.is(value);
-                }
-
-                static doc(target: unknown, propertyKey: PropertyKey, openApi: Dict): CastApiDocResponse {
-                    return pointerBase.docGen(children, target, propertyKey, openApi);
-                }
-            } as CastPointer;
-
-            nameHandler.set(clz, encoded);
-            fqnHandler.$secure.$setName(clz, encoded);
-
-            this.pool.depot.add(clz);
-            return clz;
+        if (!this.pool.depot.has(tokenized.base)) {
+            if (!this.pool.pending.has(tokenized)) {
+                this.pool.pending.queue(tokenized, (t) => this.build(t));
+            }
+            return undefined;
         }
-        return undefined;
+        // todo if child is absent
+        const children = tokenized.children.map((child) => this.pool.discover.build(child)).map((c) => c.value.clazz);
+
+        const mainBase = this.pool.depot.get(tokenized.base);
+        const mainClass = mainBase.value.clazz;
+
+        const clazz = class extends mainClass {
+            static priority = mainClass.priority;
+            static tokenized = tokenized;
+
+            static cast(value: unknown): unknown {
+                return mainClass.castGen(children, value);
+            }
+
+            static is(value: unknown) {
+                return mainClass.is(value);
+            }
+
+            static doc(openApi: CastDocCallback): CastDocResponse {
+                return mainClass.docGen(children, openApi);
+            }
+        } as CastClass;
+        const name = nameHandler.anonymous(mainClass.name, this.counter);
+        nameHandler.set(clazz, name);
+        fqnHandler.clazz(clazz, FQN);
+        reflectionPool.registerClass(clazz);
+        this.counter++;
+
+        base = this.pool.fetch.save(clazz, { tokenized });
+        this.pool.pending.complete(tokenized);
+
+        return base;
     }
 
     // endregion custom

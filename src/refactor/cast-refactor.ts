@@ -1,17 +1,19 @@
-import { $descriptor, $dev, $err, $is, $log, $repo, Dict, Func } from '@leyyo/common';
-import { DecoInstanceLike, lifecycle, PropertyReflectionLike } from '@leyyo/core';
+import { $descriptor, $dev, $err, $is, $log, $repo, Arr, Dict, Func, PropDescriptor } from '@leyyo/common';
+import { DecoInstanceLike, deploy, fqnHandler, PropertyReflectionLike } from '@leyyo/core';
+
 import { CastRefactorLike } from './index.types';
 import { CastLambda, CastPoolLike } from '../pool';
-import { CastPointer } from '../basic';
+import { CastClass } from '../basic';
 import { FQN } from '../internal';
 import { CastOpt, Dto } from '../decorators';
-import { CastFieldsSign } from '../index.symbols';
+import { CastFieldsSign, CastValueSign } from '../index.symbols';
+import { dtoHelper } from '../dto';
 
 export class CastRefactor implements CastRefactorLike {
     private readonly logger = $log.create(CastRefactor);
     private readonly methodLambda: Map<PropertyReflectionLike, Array<CastLambda>>;
-    private readonly methodPointers: Map<PropertyReflectionLike, Array<CastPointer>>;
-    private readonly fieldPointers: Map<PropertyReflectionLike, CastPointer>;
+    private readonly methodPointers: Map<PropertyReflectionLike, Array<CastClass>>;
+    private readonly fieldPointers: Map<PropertyReflectionLike, CastClass>;
 
     constructor(protected pool: CastPoolLike) {
         this.methodLambda = $repo.newMap(FQN, 'methodLambda');
@@ -22,22 +24,39 @@ export class CastRefactor implements CastRefactorLike {
     property(ins: DecoInstanceLike, opt: CastOpt): void {
         const ref = ins.asField;
         if (ref.clazz.decorators().filter((d) => d.fn === Dto).length < 1) {
+            const original = ref.clazz.creator;
+            const oldProto = original.prototype;
+            const dtoClass = class extends original {
+                constructor(...args: Arr) {
+                    super(...args);
+                    dtoHelper.onConstruct(this, ...args);
+                }
+            } as CastClass;
+            dtoClass.prototype = oldProto;
+
+            dtoHelper.checkClass(dtoClass);
+            const naming = fqnHandler.$secure.$get(original) ?? original.name;
+            dtoHelper.changeNaming(dtoClass, naming as string);
         }
         if (!opt.type) {
             opt.type = ref.type;
         }
-        const pointer = this.pool.discover.find(opt.type, false);
-        if (!pointer) {
+
+        const clazz = this.pool.discover.find(opt.type, false);
+        if (!clazz) {
             throw $dev.developerError2(FQN, 100, {
                 message: 'Invalid cast class',
-                kind: 'type',
+                kind: 'basic',
                 desc: ins.description,
-                where: 'leyyo.cast.CastPool',
-                method: 'find',
+                where: `${FQN}.CastRefactor`,
+                method: 'property',
             });
         }
 
-        this.fieldPointers.set(ref, pointer);
+        this.fieldPointers.set(ref, clazz);
+        if (clazz !== ref.type) {
+            ref.$secure.$setFieldType(clazz as Func);
+        }
         if (opt.weak) {
             return;
         }
@@ -69,20 +88,22 @@ export class CastRefactor implements CastRefactorLike {
             emptyFn = () => def;
         }
         const get = function (): unknown {
-            const rec = $descriptor.get(this, CastFieldsSign);
-            if (rec?.value) {
-                return rec.value[ref.name];
+            const rec = $descriptor.getValue<Dict>(this, CastValueSign);
+            if (rec) {
+                return rec[ref.name];
             }
             return undefined;
         };
         const set = function (value: unknown): void {
-            let rec = $descriptor.getValue<Dict>(this, CastFieldsSign);
-            if (!rec) {
-                rec = {};
-                $descriptor.save(this, CastFieldsSign, rec);
+            let desc = $descriptor.get<Dict>(this, CastValueSign);
+            if (!desc) {
+                desc = {
+                    value: {},
+                } as PropDescriptor<Dict>;
+                $descriptor.save(this, CastFieldsSign, desc.value);
             }
             try {
-                rec[ref.name] = value !== undefined ? pointer.cast(value) : emptyFn();
+                desc.value[ref.name] = value !== undefined ? clazz.cast(value) : emptyFn();
             } catch (e) {
                 const err = $err.build(e);
                 err.params['field'] = ref.name;
@@ -104,7 +125,7 @@ export class CastRefactor implements CastRefactorLike {
                 set,
             });
         }
-        lifecycle.addInfo(FQN, 100, { message: 'Field casted', desc: ins.description, pointer: pointer.name });
+        deploy.addInfo(FQN, 100, { message: 'Field casted', desc: ins.description, clazz: fqnHandler.get(clazz) });
     }
 
     parameter(ins: DecoInstanceLike, opt: CastOpt): void {
@@ -113,24 +134,28 @@ export class CastRefactor implements CastRefactorLike {
         if (!opt.type) {
             opt.type = ref.type;
         }
-        const pointer = this.pool.discover.find(opt.type, false);
-        if (!pointer) {
+        const clazz = this.pool.discover.find(opt.type, false);
+        if (!clazz) {
             throw $dev.developerError2(FQN, 100, {
                 message: 'Invalid cast class',
-                kind: 'type',
+                kind: 'basic',
                 desc: ins.description,
-                where: 'leyyo.cast.CastPool',
-                method: 'find',
+                where: `${FQN}.CastRefactor`,
+                method: 'parameter',
             });
         }
 
         if (!this.methodPointers.has(ref.property)) {
             this.methodPointers.set(ref.property, []);
-            ref.property.listParameters().forEach((p, index) => {
+            ref.property.listParameters().forEach((_p, index) => {
                 this.methodPointers.get(ref.property)[index] = undefined;
             });
         }
-        this.methodPointers.get(ref.property)[ref.index] = pointer;
+        this.methodPointers.get(ref.property)[ref.index] = clazz;
+
+        if (ref.type !== clazz) {
+            ref.$secure.$setType(clazz as Func);
+        }
 
         if (opt.weak) {
             return;
@@ -138,13 +163,13 @@ export class CastRefactor implements CastRefactorLike {
 
         if (!this.methodLambda.has(ref.property)) {
             const lambdaList = [];
-            ref.property.listParameters().forEach(_p => {
-                lambdaList.push(v => v);
+            ref.property.listParameters().forEach((_p) => {
+                lambdaList.push((v) => v);
             });
             this.methodLambda.set(ref.property, lambdaList);
         }
-        this.methodLambda.get(ref.property)[ref.index] = pointer.cast;
-        lifecycle.addInfo(FQN, 100, { message: 'Parameter casted', desc: ins.description, pointer: pointer.name });
+        this.methodLambda.get(ref.property)[ref.index] = clazz.cast;
+        deploy.addInfo(FQN, 100, { message: 'Parameter casted', desc: ins.description, clazz: fqnHandler.get(clazz) });
     }
 
     hasMethod(ref: PropertyReflectionLike): boolean {

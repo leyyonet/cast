@@ -14,7 +14,7 @@ const deco = decoratorPool
     .newId<AssignTypeOpt>(AssignType)
     .fqn(FQN)
     .targets('class')
-    .rules('no-multiple', 'no-inherited')
+    .rules('no-multiple', 'no-inherited', 'no-copy')
     .processor((ins, p) => {
         if (!Array.isArray(p.aliases)) {
             p.aliases = [];
@@ -24,19 +24,3 @@ const deco = decoratorPool
         }
         ins.set(p);
     });
-/*
-*         const clazz = ins.asClass.creator;
-        const like = clazz as unknown as TypeLike;
-
-        switch (castPool.analyse(like)) {
-            case 'type-static':
-                castPool.type.addType(like, 'type', ...p.aliases);
-                break;
-            case 'type-instance':
-                castPool.type.addType((clazz).prototype as TypeLike, 'type', ...p.aliases);
-                break;
-            default:
-                throw $dev.invalidError({issue: 'type.invalid-function', desc: ins.description});
-        }
-
-* */

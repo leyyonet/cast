@@ -1,18 +1,12 @@
-import { Dict } from '@leyyo/common';
-import { CastApiDocResponse } from '../pool';
-import { CastPointer } from '../basic';
-import {CastTokenized} from "../tokenizer";
+import { CastBase, CastDocCallback, CastDocResponse } from '../pool';
+import { CastClass } from '../basic';
+import { CastTokenized } from '../tokenizer';
 
-export type CastGenericsLambda<T = any> = (children: Array<CastPointer>, value: unknown) => T;
+export type CastGenericsLambda<T = any> = (children: Array<CastClass>, value: unknown) => T;
 // noinspection JSUnusedGlobalSymbols
-export type CastGenericsIsLambda = (children: Array<CastPointer>, value: unknown) => boolean;
-export type CastGenericsDocLambda = (
-    children: Array<CastPointer>, // child
-    target: unknown,
-    propertyKey: PropertyKey,
-    openApi: Dict,
-) => CastApiDocResponse;
+export type CastGenericsIsLambda = (children: Array<CastClass>, value: unknown) => boolean;
+export type CastGenericsDocLambda = (children: Array<CastClass>, openApi: CastDocCallback) => CastDocResponse;
 
 export interface CastGenericsLike {
-    buildPointer(tokenized: CastTokenized): CastPointer;
+    build(tokenized: CastTokenized): CastBase;
 }

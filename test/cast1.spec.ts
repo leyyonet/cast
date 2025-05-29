@@ -3,6 +3,10 @@ import {castPool} from "../src";
 import {MyClass} from "../src/samples/z-cast-class";
 
 describe('callback', () => {
+    beforeEach(() => {
+        castPool.depot.$secure.$clearAll();
+        castPool.fetch.initialize();
+    })
     describe('has', () => {
         it('fqn.full - source', () => {
             assert.equal(castPool.depot.has('leyyo.cast.MyStr'), true);

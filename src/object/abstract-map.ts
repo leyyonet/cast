@@ -2,7 +2,7 @@ import { $err, $is, ClassLike, DeveloperException, Dict, MultipleException } fro
 import { AssignType } from '../decorators';
 import { Fqn, fqnHandler } from '@leyyo/core';
 import { FQN } from '../internal';
-import { CastApiDocResponse } from '../pool';
+import { CastDocCallback, CastDocResponse } from '../pool';
 
 // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
 @AssignType()
@@ -39,7 +39,7 @@ export class AbstractMap<K = string, V = unknown> extends Map<K, V> {
         throw new DeveloperException({ issue: 'cast.notImplemented-item', clazz: fqnHandler.get(this) });
     }
 
-    static doc(target: unknown, propertyKey: PropertyKey, openApi: Dict): CastApiDocResponse {
+    static doc(openApi: CastDocCallback): CastDocResponse {
         return undefined;
     }
 

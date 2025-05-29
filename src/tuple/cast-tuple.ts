@@ -1,56 +1,103 @@
-import { $log, Arr, Dict } from '@leyyo/common';
-import { fqnHandler, nameHandler } from '@leyyo/core';
+import { $dev, $is, $log, Arr } from '@leyyo/common';
+import { fqnHandler, nameHandler, reflectionPool } from '@leyyo/core';
 import { CastTupleLike } from './index.types';
-import { CastApiDocResponse, CastPoolLike } from '../pool';
-import { CastPointer } from '../basic';
-import {CastTokenized} from "../tokenizer";
+import { CastBase, CastDocLambda, CastIsLambda, CastLambda, CastPoolLike } from '../pool';
+import { CastClass } from '../basic';
+import { CastTokenized } from '../tokenizer';
+import { FQN } from '../internal';
 
 export class CastTuple implements CastTupleLike {
     private readonly logger = $log.create(CastTuple);
+    private counter: number = 0;
 
     constructor(protected pool: CastPoolLike) {}
 
-    buildPointer(tokenized: CastTokenized): CastPointer {
+    private buildCastLambda(classes: Array<CastClass>, types: Array<string>): CastLambda {
+        return (value) => {
+            if ($is.empty(value)) {
+                return value;
+            }
+            if (!$is.arrayLike(value)) {
+                throw $dev.invalidError({
+                    message: 'Unexpected tuple value',
+                    type: typeof value,
+                    expected: `[${types.join(',')}]`,
+                });
+            }
+            let arr: Arr;
+            if (value instanceof Set) {
+                arr = Array.from(value.values());
+            } else {
+                arr = value as Arr;
+            }
+            return classes.map((clazz, index) => clazz.cast(arr[index]));
+        };
+    }
+
+    private buildIsLambda(classes: Array<CastClass>): CastIsLambda {
+        return (value) => {
+            if ($is.empty(value)) {
+                return false;
+            }
+            if (!$is.arrayLike(value)) {
+                return false;
+            }
+            let arr: Arr;
+            if (value instanceof Set) {
+                arr = Array.from(value.values());
+            } else {
+                arr = value as Arr;
+            }
+            return classes.every((clazz, index) => clazz.is(arr[index]));
+        };
+    }
+
+    private buildDocLambda(clazz: CastClass, classes: Array<CastClass>): CastDocLambda {
+        return (openApi) => {
+            return openApi(clazz, {
+                type: 'array',
+                prefixItems: classes.map((clz) => clz.doc(openApi)),
+            });
+        };
+    }
+
+    build(tokenized: CastTokenized): CastBase {
         const encoded = this.pool.tokenizer.stringify(tokenized);
-        const base = this.pool.depot.get(encoded);
+        let base = this.pool.depot.get(encoded);
         if (base) {
-            return base.value;
+            return base;
         }
-        const pointers = tokenized.children.map((child) => this.pool.discover.buildPointer(child));
-        if (pointers.some((p) => !p)) {
+        const children = tokenized.children.map((child) => this.pool.discover.build(child));
+        if (children.some((b) => !b)) {
+            if (!this.pool.pending.has(tokenized)) {
+                this.pool.pending.queue(tokenized, (t) => this.build(t));
+            }
             return undefined;
         }
+        const classes = children.map((child) => child.value.clazz);
+        const types = classes.map((clazz) => fqnHandler.get(clazz));
 
-        const clz = class AbstractTuple {
-            static priority = { array: 1 };
-            static tokenized = tokenized;
+        const clazz = class {} as CastClass;
 
-            static cast(value: unknown): unknown {
-                if (!Array.isArray(value)) {
-                    return value;
-                }
-                const arr = value as Arr;
-                return pointers.map((pointer, index) => pointer.cast(arr[index]));
+        clazz.priority = { array: 1, instance: [[Set, 5]] };
+        clazz.cast = this.buildCastLambda(classes, types);
+        clazz.is = this.buildIsLambda(classes);
+        clazz.doc = this.buildDocLambda(clazz, classes);
+
+        const name = nameHandler.anonymous('Tuple', this.counter);
+        nameHandler.set(clazz, name);
+        fqnHandler.clazz(clazz, FQN);
+
+        const ref = reflectionPool.registerClass(clazz);
+        classes.forEach((cls) => {
+            if (reflectionPool.isRegistered(cls)) {
+                ref.copyDecorators(reflectionPool.get(cls), [cls]);
             }
+        });
+        this.counter++;
 
-            static is(value: unknown) {
-                if (!Array.isArray(value)) {
-                    return false;
-                }
-                const arr = value as Arr;
-                return pointers.every((pointer, index) => pointer.is(arr[index]));
-            }
+        base = this.pool.fetch.save(clazz, { tokenized });
 
-            static doc(target: unknown, propertyKey: PropertyKey, openApi: Dict): CastApiDocResponse {
-                // todo
-                return { type: 'array' };
-            }
-        } as CastPointer;
-
-        nameHandler.set(clz, encoded);
-        fqnHandler.$secure.$setName(clz, encoded);
-
-        this.pool.depot.add(clz);
-        return clz;
+        return base;
     }
 }

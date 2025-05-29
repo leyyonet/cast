@@ -11,8 +11,7 @@ export interface CastOpt {
 export function Cast(type: CastName, weak?: boolean): PropertyDecorator;
 export function Cast(type: CastName, weak?: boolean): ParameterDecorator;
 export function Cast(type: CastName, weak: boolean = true): PropertyDecorator | ParameterDecorator {
-    return (target: Func, property: string, index?: number) =>
-        deco.process([target, property, index], { type, weak });
+    return (target: Func, property: string, index?: number) => deco.process([target, property, index], { type, weak });
 }
 
 const deco = decoratorPool
@@ -25,5 +24,3 @@ const deco = decoratorPool
         $assert.boolean(p.weak, () => $dev.desc(ins, { field: 'weak' }));
         ins.set(p);
     });
-
-// castPool.process({ given: type, target, property, description: ins.description });

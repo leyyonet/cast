@@ -1,62 +1,76 @@
-import {$is, $log, $repo, $to, ClassLike, Dict, KeyValue} from '@leyyo/common';
-import {enumPool, footprint, Fqn, fqnHandler, NamedDepotName, nameHandler} from '@leyyo/core';
-import {CastEnumLike, CastEnumName} from './index.types';
-import { CastApiDocResponse, CastPoolLike } from '../pool';
-import { CastPointer } from '../basic';
-import {FQN} from "../internal";
+import { $is, $repo, $to, KeyValue } from '@leyyo/common';
+import { enumPool, Fqn, fqnHandler, nameHandler } from '@leyyo/core';
+import { CastEnumLike, CastEnumName } from './index.types';
+import { CastBase, CastDocLambda, CastIsLambda, CastLambda, CastPoolLike } from '../pool';
+import { CastClass, CastPriority } from '../basic';
+import { FQN } from '../internal';
+import { CastTokenized } from '../tokenizer';
 
 @Fqn(FQN)
 export class CastEnum implements CastEnumLike {
-    private readonly logger = $log.create(CastEnum);
-    private counter = 0;
-    private readonly cache: Map<Array<KeyValue>, CastPointer>;
+    private readonly cache: Map<Array<KeyValue>, CastBase>;
 
     constructor(protected pool: CastPoolLike) {
         this.cache = $repo.newMap(FQN, 'enumCache');
     }
 
-    protected _build(value: NamedDepotName): CastPointer {
-        const enumBase = enumPool.getBase(value, false);
+    canBe(clazz: CastEnumName): boolean {
+        const enumBase = enumPool.getBase(clazz, false);
+        return !!enumBase;
+    }
+
+    private buildCastLambda(items: Array<KeyValue>): CastLambda {
+        return (value) => $to.literal(value, items);
+    }
+
+    private buildIsLambda(items: Array<KeyValue>): CastIsLambda {
+        return (value) => $is.literal(value, items);
+    }
+
+    private buildDocLambda(clazz: CastClass, items: Array<KeyValue>): CastDocLambda {
+        return (openApi) => openApi(clazz, { enum: items });
+    }
+
+    build(given: CastEnumName): CastBase {
+        const enumBase = enumPool.getBase(given, false);
         if (!enumBase) {
             return undefined;
         }
 
         const items = enumBase.value.items;
+        const priority = {} as CastPriority;
+        items.forEach((item) => {
+            switch (typeof item) {
+                case 'string':
+                    priority.string = 1;
+                    break;
+                case 'number':
+                    priority.number = 1;
+                    break;
+            }
+        });
         if (this.cache.has(items)) {
             return this.cache.get(items);
         }
         // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
-        const clz = class {
-            static cast(value: unknown): unknown {
-                return $to.literal(value, items);
-            }
+        const clazz = class {} as CastClass;
+        clazz.priority = priority;
+        clazz.cast = this.buildCastLambda(items);
+        clazz.is = this.buildIsLambda(items);
+        clazz.doc = this.buildDocLambda(clazz, items);
 
-            static is(value: unknown) {
-                return $is.literal(value, items);
-            }
+        const naming = fqnHandler.$secure.$get(enumBase);
+        const tokenized = { kind: 'basic', base: enumBase.full } as CastTokenized;
+        nameHandler.set(clazz, enumBase.basic);
+        fqnHandler.clazz(clazz, naming.pck);
 
-            static doc(target: unknown, propertyKey: PropertyKey, openApi: Dict): CastApiDocResponse {
-                return {};
-            }
-        } as CastPointer;
+        this.pool.depot.appendPointer(given, clazz);
+        enumBase.pointers.forEach((p) => this.pool.depot.appendPointer(given, p));
 
-        const pck = fqnHandler.$secure.$getPackage(enumBase) ?? FQN;
-        const name = nameHandler.anonymous('Enum', this.counter);
-        nameHandler.set(clz as unknown as ClassLike, name);
-        fqnHandler.$secure.$setName(clz, pck);
-        footprint.inspect(clz);
+        const base = this.pool.fetch.save(clazz, { tokenized, aliases: enumBase.aliases, naming });
+        base.value.tags.push('from-enum');
 
-        this.pool.depot.appendPointer(value, value);
-        enumBase.pointers.forEach((p) => this.pool.depot.appendPointer(value, p));
-        this.pool.depot.add(clz, ...enumBase.aliases);
-        this.cache.set(items, clz);
-        return clz;
-    }
-    canBe(clazz: CastEnumName): boolean {
-        const enumBase = enumPool.getBase(clazz, false);
-        return !!enumBase;
-    }
-    buildPointer(clazz: CastEnumName): CastPointer {
-        return this._build(clazz);
+        this.cache.set(items, base);
+        return base;
     }
 }

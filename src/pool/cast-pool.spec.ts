@@ -2,47 +2,38 @@ import { describe, test } from '@jest/globals';
 
 import { strict as assert } from 'assert';
 import { $test } from '@leyyo/common';
-import { castPool } from './cast-pool';
+import { castTokenizer } from './cast-pool';
 
 describe('10* >> Application', () => {
     test($test.title(100, '[i] Simple'), () => {
-        assert.deepEqual(castPool.discover.parse('string0'), { base: 'String0', kinds: ['type'] });
+        assert.deepEqual(castTokenizer.parse('string0'), { base: 'String0', kind: 'basic' });
     });
     test($test.title(100, '[i] Generics'), () => {
-        assert.deepEqual(castPool.discover.parse('array1<string1>'), {
+        assert.deepEqual(castTokenizer.parse('array1<string1>'), {
             base: 'Array1',
-            kinds: ['generics'],
-            children: [{ base: 'String1', kinds: ['type'] }],
+            kind: 'generics',
+            children: [{ base: 'String1', kind: 'basic' }],
         });
     });
     test($test.title(100, '[i] Generics + Union'), () => {
-        assert.deepEqual(castPool.discover.parse('array2<map1<string2, record1<object1|boolean1>>'), {
+        assert.deepEqual(castTokenizer.parse('array2<map1<string2, record1<object1|boolean1>>'), {
             base: 'Array2',
-            kinds: ['generics'],
+            kind: 'generics',
             children: [
                 {
                     base: 'Map1',
-                    kinds: ['generics'],
+                    kind: 'generics',
                     children: [
-                        {
-                            base: 'String2',
-                            kinds: ['type'],
-                        },
+                        { base: 'String2', kind: 'basic' },
                         {
                             base: 'Record1',
-                            kinds: ['generics'],
+                            kind: 'generics',
                             children: [
                                 {
-                                    kinds: ['union'],
+                                    kind: 'union',
                                     children: [
-                                        {
-                                            base: 'Object1',
-                                            kinds: ['type'],
-                                        },
-                                        {
-                                            base: 'Boolean1',
-                                            kinds: ['type'],
-                                        },
+                                        { base: 'Object1', kind: 'basic' },
+                                        { base: 'Boolean1', kind: 'basic' },
                                     ],
                                 },
                             ],
@@ -53,37 +44,59 @@ describe('10* >> Application', () => {
         });
     });
     test($test.title(100, '[i] Tuple'), () => {
-        assert.deepEqual(castPool.discover.parseCleared('[string3, number1]'), {
-            children: [{ base: 'String3' }, { base: 'Number1' }],
+        assert.deepEqual(castTokenizer.parse('[string3, number1]'), {
+            kind: 'tuple',
+            children: [
+                { base: 'String3', kind: 'basic' },
+                { base: 'Number1', kind: 'basic' },
+            ],
         });
     });
     test($test.title(100, '[i] Generics > Union'), () => {
-        assert.deepEqual(castPool.discover.parseCleared('array3<string4|number2>'), {
+        assert.deepEqual(castTokenizer.parse('array3<string4|number2>'), {
             base: 'Array3',
-            children: [{ children: [{ base: 'String4' }, { base: 'Number2' }] }],
+            kind: 'generics',
+            children: [
+                {
+                    kind: 'union',
+                    children: [
+                        { base: 'String4', kind: 'basic' },
+                        { base: 'Number2', kind: 'basic' },
+                    ],
+                },
+            ],
         });
     });
     test($test.title(100, '[i] Union'), () => {
-        assert.deepEqual(castPool.discover.parse('string5|integer1'), {
-            kinds: ['union'],
-            children: [{ base: 'String5', kinds: ['type'] }, { base: 'Integer1', kinds: ['type'] }],
+        assert.deepEqual(castTokenizer.parse('string5|integer1'), {
+            kind: 'union',
+            children: [
+                { base: 'String5', kind: 'basic' },
+                { base: 'Integer1', kind: 'basic' },
+            ],
         });
     });
     test($test.title(100, '[i] Array'), () => {
-        assert.deepEqual(castPool.discover.parse('string[]'), {
+        assert.deepEqual(castTokenizer.parse('string[]'), {
             base: 'Array',
-            kinds: ['generics'],
-            children: [{ base: 'String', kinds: ['type'] }],
+            kind: 'generics',
+            children: [{ base: 'String', kind: 'basic' }],
         });
     });
     test($test.title(100, '[i] Union > Generics'), () => {
-        assert.deepEqual(castPool.discover.parseCleared('array4<number3>|list<float1>'), {
+        assert.deepEqual(castTokenizer.parse('array4<number3>|list<float1>'), {
+            kind: 'union',
             children: [
                 {
                     base: 'Array4',
-                    children: [{ base: 'Number3' }],
+                    kind: 'generics',
+                    children: [{ base: 'Number3', kind: 'basic' }],
                 },
-                { base: 'List', children: [{ base: 'Float1' }] },
+                {
+                    base: 'List',
+                    kind: 'generics',
+                    children: [{ base: 'Float1', kind: 'basic' }],
+                },
             ],
         });
     });

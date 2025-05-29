@@ -1,49 +1,68 @@
 import { ClassLike, Dict, Func, Obj, OneOrMore } from '@leyyo/common';
 import { CastGenericsLike } from '../generics';
 import { CastUnionLike } from '../union';
-import { CastPointer, CastBasicLike } from '../basic';
+import { CastBasicLike, CastClass, CastValue } from '../basic';
 import { CastTupleLike } from '../tuple';
-import {CoreReflectionLike, NamedDepotLike} from '@leyyo/core';
-import {CastDiscoverLike} from "../discover";
-import {CastFetchLike} from "../fetch";
-import {CastRefactorLike} from "../refactor";
-import {CastTokenized, CastTokenizerLike} from "../tokenizer";
-import {CastEnumLike} from "../enum";
+import { CoreReflectionLike, NamedDepotItem, NamedDepotLike } from '@leyyo/core';
+import { CastDiscoverLike } from '../discover';
+import { CastFetchLike } from '../fetch';
+import { CastRefactorLike } from '../refactor';
+import { CastTokenized, CastTokenizerLike } from '../tokenizer';
+import { CastEnumLike } from '../enum';
+import { CastPendingLike } from '../pending';
 
 export type CastNamePlain = string | Func | Obj | ClassLike;
 export type CastName = OneOrMore<CastNamePlain>;
 
-export interface CastApiDocResponse extends Dict {
+export type CastDocCallback = (
+    clazz: ClassLike,
+    schema: CastDocResponse,
+    ...tags: Array<CastDocTags>
+) => CastDocResponse;
+
+export interface CastDocResponse extends Dict {
     type?: string;
     $ref?: string;
-    oneOf?: Array<CastApiDocResponse>;
-    items?: CastApiDocResponse;
+    oneOf?: Array<CastDocResponse>;
+    items?: CastDocResponse;
 }
 
-export type CastDocLambda = (target: unknown, propertyKey: PropertyKey, openApi: Dict) => CastApiDocResponse;
+export type CastDocLambda = (openApi: CastDocCallback) => CastDocResponse;
 export type CastIsLambda = (value: unknown) => boolean;
 export type CastLambda<T = any> = (value: unknown) => T;
 
-export type CastAnalyseType = 'type-instance' | 'type-static' | 'generic-instance' | 'generic-static';
+export type CastDocTags = 'dto' | string;
+
+export type CastAnalyseType = 'basic-instance' | 'basic-static' | 'generics-instance' | 'generics-static';
+
+export type CastBase = NamedDepotItem<CastValue, CastClass>;
 
 export interface CastPoolLike {
-    copy(source: CastPointer, target: Func | ClassLike): void;
+    get depot(): NamedDepotLike<CastValue, CastClass>;
 
-    readonly sign: symbol;
+    get basic(): CastBasicLike;
 
-    get depot(): NamedDepotLike<CastPointer, CastPointer>;
-    get type(): CastBasicLike;
     get generics(): CastGenericsLike;
+
     get tuple(): CastTupleLike;
+
     get union(): CastUnionLike;
+
     get discover(): CastDiscoverLike;
+
     get fetch(): CastFetchLike;
+
     get refactor(): CastRefactorLike;
+
     get tokenizer(): CastTokenizerLike;
+
     get enum(): CastEnumLike;
+
+    get pending(): CastPendingLike;
 }
 
-export type CastKind = 'type' | 'generics' | 'union' | 'tuple' | 'from-dto' | 'from-generics' | 'from-tuple' | 'from-union' | 'from-native' | 'from-enum';
+export type CastKind = 'basic' | 'generics' | 'union' | 'tuple';
+export type CastTag = 'from-dto' | 'from-generics' | 'from-tuple' | 'from-union' | 'from-native' | 'from-enum';
 
 export interface CastDecoOpt {
     given: CastName;

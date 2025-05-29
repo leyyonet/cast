@@ -15,7 +15,7 @@ const deco = decoratorPool
     .newId<AssignTupleOpt>(AssignTuple)
     .fqn(FQN)
     .targets('class')
-    .rules('no-multiple', 'no-inherited')
+    .rules('no-multiple', 'no-inherited', 'no-copy')
     .processor((ins, p) => {
         if (Array.isArray(p.types) && p.types.length < 1) {
             delete p.types;

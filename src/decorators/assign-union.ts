@@ -15,7 +15,7 @@ const deco = decoratorPool
     .newId<AssignUnionOpt>(AssignUnion)
     .fqn(FQN)
     .targets('class')
-    .rules('no-multiple', 'no-inherited')
+    .rules('no-multiple', 'no-inherited', 'no-copy')
     .processor((ins, p) => {
         if (Array.isArray(p.types) && p.types.length < 1) {
             delete p.types;
@@ -23,16 +23,3 @@ const deco = decoratorPool
         $assert.array(p.types, () => $dev.desc(ins, { field: 'types' }));
         ins.set(p);
     });
-// castPool.type.addType(like, 'union');
-// const clazz = ins.asClass.creator;
-// let like = clazz as unknown as TypeLike;
-// castPool.union.addCache(castPool.generics.parse(p.types.join('|')), like)
-// switch (castPool.analyse(like)) {
-//     case 'type-static':
-//         break;
-//     case 'type-instance':
-//         like = (clazz).prototype as TypeLike;
-//         break;
-//     default:
-//         throw $dev.invalidError({issue: 'union.invalid-function', desc: ins.description});
-// }

@@ -1,7 +1,5 @@
-import {AbstractDto} from "./abstract-dto";
-import {AbstractMap} from "./abstract-map";
-import {AbstractSet} from "./abstract-set";
+import { AbstractDto } from './abstract-dto';
+import { AbstractMap } from './abstract-map';
+import { AbstractSet } from './abstract-set';
 
-export const $$castAbstracts = [
-    AbstractDto, AbstractMap, AbstractSet
-];
+export const $$castAbstracts = [AbstractDto, AbstractMap, AbstractSet];

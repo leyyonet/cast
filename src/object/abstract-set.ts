@@ -1,4 +1,4 @@
-import { CastApiDocResponse } from '../pool';
+import { CastDocCallback, CastDocResponse } from '../pool';
 import { Fqn, fqnHandler } from '@leyyo/core';
 import { FQN } from '../internal';
 import { $err, $is, Arr, ClassLike, DeveloperException, Dict, MultipleException } from '@leyyo/common';
@@ -49,7 +49,7 @@ export class AbstractSet<V = unknown> extends Set<V> {
         return super.add(this._castItem(value));
     }
 
-    static doc(target: unknown, propertyKey: PropertyKey, openApi: Dict): CastApiDocResponse {
+    static doc(openApi: CastDocCallback): CastDocResponse {
         return undefined;
     }
 

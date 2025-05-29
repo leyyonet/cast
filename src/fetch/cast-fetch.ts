@@ -1,8 +1,8 @@
-import {decoratorPool, Fqn, lifecycle} from '@leyyo/core';
-import { $descriptor, $dev, $is, $repo, ClassLike } from '@leyyo/common';
+import { decoratorPool, Fqn, fqnHandler, lifecycle, reflectionPool } from '@leyyo/core';
+import { $assert, $dev, $is, $log, Arr, ClassLike, Func } from '@leyyo/common';
 
-import { CastFetchLike } from './index.types';
-import { CastAnalyseType, CastKind, CastPoolLike } from '../pool';
+import { CastFetchLike, CastFetchSave } from './index.types';
+import { CastAnalyseType, CastBase, CastDocCallback, CastDocResponse, CastPoolLike } from '../pool';
 import {
     AssignGenerics,
     AssignGenericsOpt,
@@ -19,126 +19,110 @@ import {
     Dto,
     DtoOpt,
 } from '../decorators';
-import { CastExtension, CastPointer } from '../basic';
+import { CastClass } from '../basic';
 import { FQN } from '../internal';
-import { CastExtensionSign } from '../index.symbols';
-import {CastTokenized} from "../tokenizer";
+import { CastTokenized } from '../tokenizer';
+import { dtoHelper } from '../dto';
 
 @Fqn(FQN)
 export class CastFetch implements CastFetchLike {
-    protected readonly _CAST_FUNCTIONS = ['cast', 'doc'] as Array<keyof CastPointer>;
-    protected readonly _GEN_FUNCTIONS = ['castGen', 'docGen'] as Array<keyof CastPointer>;
-    protected readonly assignedPointers: Set<CastPointer>;
+    protected readonly _CAST_FUNCTIONS = ['cast', 'doc'] as Array<keyof CastClass>;
+    protected readonly _GEN_FUNCTIONS = ['castGen', 'docGen'] as Array<keyof CastClass>;
+    protected readonly logger = $log.create(CastFetch);
 
     constructor(private pool: CastPoolLike) {
-        this.assignedPointers = $repo.newSet(FQN, 'assignedPointers');
+        lifecycle
+            .onAll(FQN)
+            .before('leyyo.http-api')
+            .before('leyyo.http-client')
+            .before('leyyo.validator')
+            .before('leyyo.pipe')
+            .before('leyyo.middleware');
 
-        lifecycle.onInitialize(FQN, () => this.initialize())
-            .before('leyyo.http-api')
-            .before('leyyo.http-client')
-            .before('leyyo.validator')
-            .before('leyyo.pipe')
-            .before('leyyo.middleware');
-        lifecycle.onProcess(FQN, () => this.process())
-            .before('leyyo.http-api')
-            .before('leyyo.http-client')
-            .before('leyyo.validator')
-            .before('leyyo.pipe')
-            .before('leyyo.middleware');
+        lifecycle.onInitialize(FQN, () => this.initialize());
+        lifecycle.onProcess(FQN, () => this.process());
     }
 
-    analyse(pointer: CastPointer): CastAnalyseType {
-        if (!['function', 'object'].includes(typeof pointer)) {
+    copy(source: CastClass, target: Func | ClassLike): void {
+        if (!this.pool.depot.has(source)) {
+            throw $dev.developerError2(FQN, 100, { message: 'Source was not defined', source: fqnHandler.get(source) });
+        }
+        if (this.pool.depot.has(target)) {
+            throw $dev.developerError2(FQN, 100, {
+                message: 'Target was already defined',
+                target: fqnHandler.get(target),
+            });
+        }
+        $assert.func(target, () => $dev.opt({ field: 'target', where: 'leyyo.cast.CastFetch', method: 'copy' }));
+
+        [...this._CAST_FUNCTIONS, ...this._GEN_FUNCTIONS].forEach((fn) => {
+            if (typeof source[fn as string] === 'function') {
+                target[fn as string] = (...args: Arr) => source[fn as string](...args);
+            }
+        });
+        if (source.priority) {
+            target['priority'] = source.priority;
+        }
+        this.pool.depot.appendPointer(target, source);
+    }
+
+    analyse(clazz: CastClass): CastAnalyseType {
+        if (!['function', 'object'].includes(typeof clazz)) {
             return null;
         }
-        if (this._GEN_FUNCTIONS.every((fn) => typeof pointer[fn] === 'function')) {
-            return 'generic-static';
+        if (this._GEN_FUNCTIONS.every((fn) => typeof clazz[fn] === 'function')) {
+            return 'generics-static';
         }
-        const proto = (pointer as unknown as ClassLike).prototype;
+        const proto = (clazz as unknown as ClassLike).prototype;
         if (proto) {
             if (this._GEN_FUNCTIONS.every((fn) => typeof proto[fn] === 'function')) {
-                return 'generic-instance';
+                return 'generics-instance';
             }
         }
-        if (this._CAST_FUNCTIONS.every((fn) => typeof pointer[fn] === 'function')) {
-            return 'type-static';
+        if (this._CAST_FUNCTIONS.every((fn) => typeof clazz[fn] === 'function')) {
+            return 'basic-static';
         }
         if (proto) {
             if (this._CAST_FUNCTIONS.every((fn) => typeof proto[fn] === 'function')) {
-                return 'type-instance';
+                return 'basic-instance';
             }
         }
         return null;
     }
 
-    protected _getExtension(pointer: CastPointer): CastExtension {
-        return $descriptor.getValue<CastExtension>(pointer, CastExtensionSign);
-    }
-
-    protected _setExtension(pointer: CastPointer, extension: CastExtension) {
-        $descriptor.save(pointer, CastExtensionSign, extension);
-    }
-
-    protected _refreshKind(extension: CastExtension, kinds: Array<CastKind>) {
-        if (!Array.isArray(extension.tokenized.kinds)) {
-            extension.tokenized.kinds = [];
+    save(clazz: CastClass, opt: CastFetchSave): CastBase {
+        const encoded = this.pool.tokenizer.stringify(opt.tokenized);
+        if (!Array.isArray(opt.aliases)) {
+            opt.aliases = [];
         }
-        if (Array.isArray(kinds)) {
-            kinds.forEach((kind) => {
-                if (!extension.tokenized.kinds.includes(kind)) {
-                    extension.tokenized.kinds.push(kind);
-                }
-            });
-        }
-        extension.hash = this.pool.tokenizer.stringify(extension.tokenized);
+        opt.aliases.push(encoded);
+        const base = this.pool.depot.add({ clazz, tokenized: opt.tokenized, tags: [] }, ...opt.aliases);
+        base.value.naming = opt.naming ?? fqnHandler.$secure.$get(clazz);
+        this.logger.debug(`${clazz.name} is registered as ${encoded}`);
+        return base;
     }
 
-    save(
-        pointer: CastPointer,
-        tokenized: CastTokenized,
-        aliases: Array<string>,
-        kinds: Array<CastKind>,
-        ext: Partial<CastExtension>,
-    ): void {
-        const extension = { tokenized, names: [] } as CastExtension;
-        this._refreshKind(extension, kinds);
-        const base = this.pool.depot.add(pointer, ...aliases, extension.hash);
-        [base.full, base.basic, ...aliases].forEach((name) => {
-            if (name && !extension.names.includes(name)) {
-                extension.names.push(name);
-            }
-        });
-
-        if ($is.bareObject(ext)) {
-            for (const [k, v] of Object.entries(ext)) {
-                if (!['tokenized', 'names'].includes(k)) {
-                    extension[k] = v;
-                }
-            }
-        }
-        this._setExtension(pointer, extension);
-        this.assignedPointers.add(pointer);
-    }
-
-    protected assignType(): void {
+    protected fetchAssignType(): void {
         const id = decoratorPool.get(AssignType, true).asIdentifier;
         id.instances.forEach((ins) => {
             const classRef = ins.asClass;
             const opt = ins.getValue<AssignTypeOpt>();
-            const pointer = classRef.creator as CastPointer;
-            if (this.assignedPointers.has(pointer)) {
+            const clazz = classRef.creator as CastClass;
+            const tokenized = this.pool.tokenizer.parse(clazz, true);
+
+            if (this.pool.depot.has(clazz) || this.pool.depot.has(clazz)) {
                 throw $dev.developerError2(FQN, 100, {
                     message: 'Duplicated cast class',
                     desc: ins.description,
                     where: `${FQN}.CastFetch`,
                 });
             }
-            const status = this.analyse(pointer);
+            const status = this.analyse(clazz);
             switch (status) {
-                case 'type-instance':
-                case 'type-static':
-                    const tokenized = this.pool.tokenizer.parse(pointer, true);
-                    this.save(pointer, tokenized, opt.aliases, ['type'], {});
+                case 'basic-instance':
+                case 'basic-static':
+                    this.save(clazz, { tokenized, aliases: opt.aliases });
+
                     break;
                 default:
                     throw $dev.developerError2(FQN, 100, {
@@ -150,32 +134,32 @@ export class CastFetch implements CastFetchLike {
         });
     }
 
-    protected assignGenerics(): void {
+    protected fetchAssignGenerics(): void {
         const id = decoratorPool.get(AssignGenerics, true).asIdentifier;
         id.instances.forEach((ins) => {
             const classRef = ins.asClass;
             const opt = ins.getValue<AssignGenericsOpt>();
-            const pointer = classRef.creator as CastPointer;
-            if (this.assignedPointers.has(pointer)) {
-                const extension = this._getExtension(pointer);
-                if (extension) {
-                    this._refreshKind(extension, ['from-generics']);
-                    extension.gen = { min: opt.min, max: opt.max };
-                    this._setExtension(pointer, extension);
+            const clazz = classRef.creator as CastClass;
+
+            const tokenized = this.pool.tokenizer.parse(clazz, true);
+            let base = this.pool.depot.get(clazz);
+            if (base) {
+                if (!base.value.tags.includes('from-generics')) {
+                    base.value.tags.push('from-generics');
                 }
+                base.value.generics = { min: opt.min, max: opt.max };
                 return;
             }
-            const status = this.analyse(pointer);
+            const status = this.analyse(clazz);
             switch (status) {
-                case 'type-instance':
-                case 'type-static':
-                    const tokenized = this.pool.tokenizer.parse(pointer, true);
-                    this.save(pointer, tokenized, opt.aliases, ['type', 'from-generics'], {
-                        gen: {
-                            min: opt.min,
-                            max: opt.max,
-                        },
-                    });
+                case 'basic-instance':
+                case 'basic-static':
+                    base = this.save(clazz, { tokenized, aliases: opt.aliases });
+                    base.value.generics = {
+                        min: opt.min,
+                        max: opt.max,
+                    };
+                    base.value.tags.push('from-generics');
                     break;
                 default:
                     throw $dev.developerError2(FQN, 101, {
@@ -187,32 +171,36 @@ export class CastFetch implements CastFetchLike {
         });
     }
 
-    protected assignTuple(): void {
+    protected fetchAssignTuple(): void {
         const id = decoratorPool.get(AssignTuple, true).asIdentifier;
         id.instances.forEach((ins) => {
             const classRef = ins.asClass;
             const opt = ins.getValue<AssignTupleOpt>();
 
-            const tokenized = {} as CastTokenized;
+            const tokenized = { kind: 'basic' } as CastTokenized;
             tokenized.children = opt.types.map((t) => this.pool.tokenizer.parse(t, true));
-            const pointer = classRef.creator as CastPointer;
-            if (this.assignedPointers.has(pointer)) {
+            const encoded = this.pool.tokenizer.stringify(tokenized);
+            const clazz = classRef.creator as CastClass;
+            if (this.pool.depot.has(clazz) || this.pool.depot.has(encoded)) {
                 throw $dev.developerError2(FQN, 100, {
                     message: 'Duplicated cast class',
                     desc: ins.description,
                     where: `${FQN}.CastFetch`,
+                    clazz,
+                    encoded,
                 });
             }
-            const status = this.analyse(pointer);
+            const status = this.analyse(clazz);
             switch (status) {
-                case 'type-instance':
-                case 'type-static':
-                    this.save(pointer, tokenized, [], ['type', 'from-tuple'], {});
+                case 'basic-instance':
+                case 'basic-static':
+                    const base = this.save(clazz, { tokenized });
+                    base.value.tags.push('from-tuple');
                     break;
                 default:
                     throw $dev.developerError2(FQN, 100, {
                         message: 'Invalid cast class',
-                        kind: 'type',
+                        kind: 'basic',
                         class: classRef.description,
                         where: 'leyyo.cast.CastPool',
                         method: 'find',
@@ -221,68 +209,104 @@ export class CastFetch implements CastFetchLike {
         });
     }
 
-    protected assignUnion(): void {
+    protected fetchAssignUnion(): void {
         const id = decoratorPool.get(AssignUnion, true).asIdentifier;
         id.instances.forEach((ins) => {
             const classRef = ins.asClass;
             const opt = ins.getValue<AssignUnionOpt>();
 
-            const tokenized = {} as CastTokenized;
+            const tokenized = { kind: 'basic' } as CastTokenized;
             tokenized.children = opt.types.map((t) => this.pool.tokenizer.parse(t, true));
-            const pointer = classRef.creator as CastPointer;
-            if (this.assignedPointers.has(pointer)) {
+            const encoded = this.pool.tokenizer.stringify(tokenized);
+            const clazz = classRef.creator as CastClass;
+            if (this.pool.depot.has(clazz) || this.pool.depot.has(encoded)) {
                 throw $dev.developerError2(FQN, 100, {
                     message: 'Duplicated cast class',
                     desc: ins.description,
                     where: `${FQN}.CastFetch`,
+                    method: 'fetchAssignUnion',
+                    clazz,
+                    encoded,
                 });
             }
-            const status = this.analyse(pointer);
+            const status = this.analyse(clazz);
             switch (status) {
-                case 'type-instance':
-                case 'type-static':
-                    this.save(pointer, tokenized, [], ['type', 'from-union'], {});
+                case 'basic-instance':
+                case 'basic-static':
+                    const base = this.save(clazz, { tokenized });
+                    base.value.tags.push('from-union');
                     break;
                 default:
                     throw $dev.developerError2(FQN, 100, {
                         message: 'Invalid cast class',
-                        kind: 'type',
+                        kind: 'basic',
                         class: classRef.description,
-                        where: 'leyyo.cast.CastPool',
-                        method: 'find',
+                        where: `${FQN}.CastFetch`,
+                        method: 'fetchAssignUnion',
                     });
             }
         });
     }
 
-    protected dto(): void {
+    protected fetchDto(): void {
         const id = decoratorPool.get(Dto, true).asIdentifier;
         id.instances.forEach((ins) => {
             const classRef = ins.asClass;
             const opt = ins.getValue<DtoOpt>();
-            const pointer = classRef.creator as CastPointer;
-            if (this.assignedPointers.has(pointer)) {
-                const extension = this._getExtension(pointer);
-                if (extension) {
-                    this._refreshKind(extension, ['from-dto']);
-                    this._setExtension(pointer, extension);
+            const clazz = classRef.creator as CastClass;
+
+            const tokenized = this.pool.tokenizer.parse(clazz, true);
+            let base = this.pool.depot.get(clazz);
+            if (base) {
+                if (!base.value.tags.includes('from-dto')) {
+                    base.value.tags.push('from-dto');
                 }
                 return;
             }
-            const status = this.analyse(pointer);
+
+            dtoHelper.buildClass(clazz);
+            if (!$is.bareObject(clazz.priority)) {
+                clazz.priority = {
+                    instance: [
+                        [clazz, 1],
+                        [Map, 2],
+                    ],
+                    object: 2,
+                };
+            }
+            if (typeof clazz.cast !== 'function') {
+                clazz.cast = (value: unknown): unknown => dtoHelper.onCast(clazz, value);
+            }
+            if (typeof clazz.is !== 'function') {
+                clazz.is = (value: unknown): boolean => $is.object(value);
+            }
+            if (typeof clazz.doc !== 'function') {
+                reflectionPool
+                    .get(clazz)
+                    .listInstanceProperties({ kind: 'field' })
+                    .forEach((propRef) => {
+                        if (propRef.hasDecorator(Cast)) {
+                        }
+                    });
+                clazz.doc = (openApi: CastDocCallback): CastDocResponse => {
+                    return openApi(clazz, { type: 'object' }, 'dto');
+                };
+            }
+
+            const status = this.analyse(clazz);
             switch (status) {
-                case 'type-instance':
-                case 'type-static':
-                    const tokenized = this.pool.tokenizer.parse(pointer, true);
-                    this.save(pointer, tokenized, opt.aliases, ['type', 'from-dto'], {});
+                case 'basic-instance':
+                case 'basic-static':
+                    this.save(clazz, { tokenized, aliases: opt.aliases });
+                    base.value.tags.push('from-dto');
                     break;
                 default:
                     throw $dev.developerError2(FQN, 100, {
                         message: 'Invalid cast class',
-                        kind: 'type',
+                        kind: 'basic',
                         class: classRef.description,
-                        where: 'leyyo.cast.CastPool',
-                        method: 'find',
+                        where: `${FQN}.CastFetch`,
+                        method: 'dto',
                     });
             }
         });
@@ -293,23 +317,27 @@ export class CastFetch implements CastFetchLike {
         id.instances.forEach((ins) => {
             const classRef = ins.asClass;
             const opt = ins.getValue<DiscriminatorOpt>();
-            opt.field;
-            opt.values;
-            const pointer = classRef.creator as CastPointer;
-            const status = this.analyse(pointer);
+            const clazz = classRef.creator as CastClass;
+
+            let base = this.pool.depot.get(clazz);
+            if (base) {
+                base.value.discriminator = {
+                    field: opt.field,
+                    values: opt.values,
+                };
+                if (!base.value.tags.includes('from-dto')) {
+                    base.value.tags.push('from-dto');
+                }
+                return;
+            }
+            const tokenized = this.pool.tokenizer.parse(clazz, true);
+            const status = this.analyse(clazz);
             switch (status) {
-                case 'type-instance':
-                case 'type-static':
-                    this.pool.depot.add(pointer);
+                case 'basic-instance':
+                case 'basic-static':
+                    base = this.save(clazz, { tokenized });
+                    base.value.tags.push('from-dto');
                     break;
-                default:
-                    throw $dev.developerError2(FQN, 100, {
-                        message: 'Invalid cast class',
-                        kind: 'type',
-                        class: classRef.description,
-                        where: 'leyyo.cast.CastPool',
-                        method: 'find',
-                    });
             }
         });
     }
@@ -327,13 +355,12 @@ export class CastFetch implements CastFetchLike {
     }
 
     initialize(): void {
-        this.assignType();
-        this.assignGenerics();
-        this.assignTuple();
-        this.assignUnion();
-        this.dto();
-        this.assignedPointers.clear();
-
+        this.fetchAssignType();
+        this.fetchAssignGenerics();
+        this.fetchAssignTuple();
+        this.fetchAssignUnion();
+        this.fetchDto();
+        this.fetchDiscriminator();
     }
 
     process(): void {

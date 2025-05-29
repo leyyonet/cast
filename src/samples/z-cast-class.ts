@@ -2,12 +2,13 @@ import { $is, $to, Dict } from '@leyyo/common';
 import { Fqn } from '@leyyo/core';
 import { AssignType, Cast, Dto } from '../decorators';
 import { FQN } from '../internal';
+import { CastDocCallback, CastDocResponse } from '../pool';
 
 // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
 @AssignType('Str2', 'str')
 @Fqn(FQN)
 export class MyStr {
-    static doc(target: unknown, propertyKey: string, openApi: Dict): Dict {
+    static doc(openApi: CastDocCallback): Dict {
         return { type: 'string' };
     }
 
@@ -28,7 +29,7 @@ export class MyInt {
         return $is.integer(value);
     }
 
-    static doc(target: unknown, propertyKey: PropertyKey, openApi: Dict): Dict {
+    static doc(openApi: CastDocCallback): CastDocResponse {
         return { type: 'integer' };
     }
 

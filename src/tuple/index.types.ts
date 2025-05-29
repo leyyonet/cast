@@ -1,6 +1,6 @@
-import { CastPointer } from '../basic';
-import {CastTokenized} from "../tokenizer";
+import { CastTokenized } from '../tokenizer';
+import { CastBase } from '../pool';
 
 export interface CastTupleLike {
-    buildPointer(tokenized: CastTokenized): CastPointer;
+    build(tokenized: CastTokenized): CastBase;
 }
