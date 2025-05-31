@@ -43,16 +43,6 @@ export interface CastOptHash<V extends CastOpt = CastOpt, K extends CastOpt = Ca
 
 // noinspection JSUnusedGlobalSymbols
 // todo
-export interface CastPrimitiveLike<T = unknown, O extends CastOpt = CastOpt> {
-    is(value: unknown): boolean;
-    isHash(value: unknown, opt?: RecLike & O): boolean;
-    isArray(value: unknown, opt?: RecLike & O): boolean;
-    innerCast(value: unknown, opt?: O): T | null;
-    cast(value: unknown): T | null;
-    castArray(value: unknown, opt?: RecLike & O): Array<T>;
-    castHash(value: unknown, opt?: RecLike & O): RecLike<T>;
-    empty(value: unknown): boolean;
-}
 
 /*
 *             it(`Validate result`, (done) => {
@@ -60,7 +50,7 @@ export interface CastPrimitiveLike<T = unknown, O extends CastOpt = CastOpt> {
                     if ((response as GamePair).id === 'A') {
                         done();
                     } else {
-                        done(new Error('Result is different: ' + JSON.stringify(response)));
+                        done(new Error('Result different: ' + JSON.stringify(response)));
                     }
                 })
                     .catch((err) => {

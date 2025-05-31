@@ -2,30 +2,34 @@ import { Arr, Dict } from '@leyyo/common';
 import { Fqn } from '@leyyo/core';
 
 import { FQN } from '../internal';
-import { CastDocCallback, CastDocResponse } from '../pool';
-import { dtoHelper } from '../dto';
+import { CastDocCallback, CastDocResponse } from '../shared';
+import { castPool } from '../hub';
 
 // noinspection TypeScriptAbstractClassConstructorCanBeMadeProtected,JSUnusedGlobalSymbols, JSUnusedLocalSymbols
 @Fqn(FQN)
 export class AbstractDto {
     constructor(...args: Arr) {
-        dtoHelper.onConstruct(this, ...args);
+        castPool.dto.onConstruct(this, ...args);
     }
 
     static doc(openApi: CastDocCallback): CastDocResponse {
-        return dtoHelper.onDoc(this, openApi);
+        return castPool.dto.onDoc(this, openApi);
     }
 
     static cast(value: unknown): unknown {
-        return dtoHelper.onCast(this, value);
+        return castPool.dto.onCast(this, value);
     }
 
-    static is(value: unknown): boolean {
-        return dtoHelper.onIs(this, value);
+    static canBe(value: unknown): boolean {
+        return castPool.dto.onCanBe(this, value);
+    }
+
+    static exact(value: unknown): boolean {
+        return castPool.dto.onExact(this, value);
     }
 
     toJSON(): Dict {
-        return dtoHelper.toJson(this, AbstractDto);
+        return castPool.dto.onJson(this, AbstractDto);
     }
 }
 

@@ -1,61 +1,35 @@
-import { $descriptor, $dev, $err, $is, $log, $repo, Arr, Dict, Func, PropDescriptor } from '@leyyo/common';
-import { DecoInstanceLike, deploy, fqnHandler, PropertyReflectionLike } from '@leyyo/core';
+import { $descriptor, $dev, $err, $is, $log, $repo, Dict, Func, PropDescriptor } from '@leyyo/common';
+import { DecoInstanceLike, fqnHandler, PropertyReflectionLike } from '@leyyo/core';
 
 import { CastRefactorLike } from './index.types';
-import { CastLambda, CastPoolLike } from '../pool';
-import { CastClass } from '../basic';
 import { FQN } from '../internal';
-import { CastOpt, Dto } from '../decorators';
-import { CastFieldsSign, CastValueSign } from '../index.symbols';
-import { dtoHelper } from '../dto';
+import { CastOpt } from '../decorators';
+import { CastValueSign } from '../index.symbols';
+import { CastClass, CastLambda } from '../shared';
+import { CastHubLike } from '../hub';
 
 export class CastRefactor implements CastRefactorLike {
     private readonly logger = $log.create(CastRefactor);
-    private readonly methodLambda: Map<PropertyReflectionLike, Array<CastLambda>>;
-    private readonly methodPointers: Map<PropertyReflectionLike, Array<CastClass>>;
-    private readonly fieldPointers: Map<PropertyReflectionLike, CastClass>;
+    private readonly methodLambda = $repo.newMap<PropertyReflectionLike, Array<CastLambda>>(FQN, 'methodLambda');
+    private readonly methodClasses = $repo.newMap<PropertyReflectionLike, Array<CastClass>>(FQN, 'methodClasses');
 
-    constructor(protected pool: CastPoolLike) {
-        this.methodLambda = $repo.newMap(FQN, 'methodLambda');
-        this.methodPointers = $repo.newMap(FQN, 'methodPointers');
-        this.fieldPointers = $repo.newMap(FQN, 'fieldPointers');
-    }
+    constructor(private hub: CastHubLike) {}
 
     property(ins: DecoInstanceLike, opt: CastOpt): void {
         const ref = ins.asField;
-        if (ref.clazz.decorators().filter((d) => d.fn === Dto).length < 1) {
-            const original = ref.clazz.creator;
-            const oldProto = original.prototype;
-            const dtoClass = class extends original {
-                constructor(...args: Arr) {
-                    super(...args);
-                    dtoHelper.onConstruct(this, ...args);
-                }
-            } as CastClass;
-            dtoClass.prototype = oldProto;
-
-            dtoHelper.checkClass(dtoClass);
-            const naming = fqnHandler.$secure.$get(original) ?? original.name;
-            dtoHelper.changeNaming(dtoClass, naming as string);
-        }
         if (!opt.type) {
             opt.type = ref.type;
         }
 
-        const clazz = this.pool.discover.find(opt.type, false);
-        if (!clazz) {
-            throw $dev.developerError2(FQN, 100, {
-                message: 'Invalid cast class',
-                kind: 'basic',
-                desc: ins.description,
-                where: `${FQN}.CastRefactor`,
-                method: 'property',
-            });
-        }
+        const clazz = this.hub.discover.find(opt.type, () => $dev.opt({
+            kind: 'basic',
+            desc: ins.description,
+            where: `${FQN}.CastRefactor`,
+            method: 'property',
+        }));
 
-        this.fieldPointers.set(ref, clazz);
         if (clazz !== ref.type) {
-            ref.$secure.$setFieldType(clazz as Func);
+            ref.$secure.$setType(clazz as Func);
         }
         if (opt.weak) {
             return;
@@ -100,7 +74,7 @@ export class CastRefactor implements CastRefactorLike {
                 desc = {
                     value: {},
                 } as PropDescriptor<Dict>;
-                $descriptor.save(this, CastFieldsSign, desc.value);
+                $descriptor.save(this, CastValueSign, desc.value);
             }
             try {
                 desc.value[ref.name] = value !== undefined ? clazz.cast(value) : emptyFn();
@@ -125,7 +99,11 @@ export class CastRefactor implements CastRefactorLike {
                 set,
             });
         }
-        deploy.addInfo(FQN, 100, { message: 'Field casted', desc: ins.description, clazz: fqnHandler.get(clazz) });
+        this.logger.deploy.$info(FQN, 100, {
+            message: 'Field casted',
+            desc: ins.description,
+            clazz: fqnHandler.get(clazz),
+        });
     }
 
     parameter(ins: DecoInstanceLike, opt: CastOpt): void {
@@ -134,24 +112,21 @@ export class CastRefactor implements CastRefactorLike {
         if (!opt.type) {
             opt.type = ref.type;
         }
-        const clazz = this.pool.discover.find(opt.type, false);
-        if (!clazz) {
-            throw $dev.developerError2(FQN, 100, {
-                message: 'Invalid cast class',
-                kind: 'basic',
-                desc: ins.description,
-                where: `${FQN}.CastRefactor`,
-                method: 'parameter',
-            });
-        }
+        const clazz = this.hub.discover.find(opt.type, () => $dev.opt({
+            message: 'Invalid cast class',
+            kind: 'basic',
+            desc: ins.description,
+            where: `${FQN}.CastRefactor`,
+            method: 'parameter',
+        }));
 
-        if (!this.methodPointers.has(ref.property)) {
-            this.methodPointers.set(ref.property, []);
+        if (!this.methodClasses.has(ref.property)) {
+            this.methodClasses.set(ref.property, []);
             ref.property.listParameters().forEach((_p, index) => {
-                this.methodPointers.get(ref.property)[index] = undefined;
+                this.methodClasses.get(ref.property)[index] = undefined;
             });
         }
-        this.methodPointers.get(ref.property)[ref.index] = clazz;
+        this.methodClasses.get(ref.property)[ref.index] = clazz;
 
         if (ref.type !== clazz) {
             ref.$secure.$setType(clazz as Func);
@@ -169,7 +144,11 @@ export class CastRefactor implements CastRefactorLike {
             this.methodLambda.set(ref.property, lambdaList);
         }
         this.methodLambda.get(ref.property)[ref.index] = clazz.cast;
-        deploy.addInfo(FQN, 100, { message: 'Parameter casted', desc: ins.description, clazz: fqnHandler.get(clazz) });
+        this.logger.deploy.$info(FQN, 100, {
+            message: 'Parameter casted',
+            desc: ins.description,
+            clazz: fqnHandler.get(clazz),
+        });
     }
 
     hasMethod(ref: PropertyReflectionLike): boolean {

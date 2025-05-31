@@ -1,9 +1,8 @@
-import { CastClass } from '../basic';
-import { CastBase, CastName } from '../pool';
-import { CastTokenized } from '../tokenizer';
+import { CastBase, CastClass, CastName, CastTokenized } from '../shared';
+import {DevCallback} from "@leyyo/common";
 
 export interface CastDiscoverLike {
-    find(clazz: CastName, required?: boolean): CastClass;
+    find(clazz: CastName, required?: DevCallback|true): CastClass;
 
     run(clazz: CastName, value: unknown): unknown;
 

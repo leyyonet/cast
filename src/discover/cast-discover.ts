@@ -1,17 +1,16 @@
-import { $dev, ClassLike, List } from '@leyyo/common';
+import {$dev, AssertionCallback, ClassLike, DevCallback, Func, List} from '@leyyo/common';
+import { Fqn, reflectionPool } from '@leyyo/core';
 
 import { CastDiscoverLike } from './index.types';
-import { CastBase, CastName, CastNamePlain, CastPoolLike } from '../pool';
-import { CastClass } from '../basic';
+import { CastHubLike } from '../hub';
+import { CastBase, CastClass, CastName, CastNamePlain, CastTokenized } from '../shared';
 import { FQN } from '../internal';
-import { CastTokenized } from '../tokenizer';
-import { Fqn } from '@leyyo/core';
 
 @Fqn(FQN)
 export class CastDiscover implements CastDiscoverLike {
-    constructor(private pool: CastPoolLike) {}
+    constructor(private hub: CastHubLike) {}
 
-    find(clazz: CastName, required?: boolean): CastClass {
+    private _find(clazz: CastName): CastClass {
         switch (typeof clazz) {
             case 'string':
                 return this.findWithString(clazz);
@@ -45,33 +44,32 @@ export class CastDiscover implements CastDiscoverLike {
                             });
                     }
                 }
-                const status = this.pool.fetch.analyse(clazz as CastClass);
-                switch (status) {
-                    case 'basic-instance':
-                    case 'basic-static':
-                        return this.findWithNative(clazz as CastClass);
-                    default:
-                        throw $dev.developerError2(FQN, 100, {
-                            message: 'Class is not a cast class',
-                            value: clazz,
-                            where: `${FQN}.CastDiscover`,
-                            field: 'status',
-                            status,
-                            method: 'find',
-                        });
-                }
+                return this.findWithNative(clazz as CastClass);
             default:
-                if (required) {
-                    throw $dev.developerError2(FQN, 100, {
-                        message: 'Invalid class name',
-                        value: clazz,
-                        type: typeof clazz,
-                        where: `${FQN}.CastDiscover`,
-                        method: 'find',
-                    });
-                }
-                return undefined;
+                throw $dev.developerError2(FQN, 100, {
+                    message: 'Invalid class name',
+                    value: clazz,
+                    type: typeof clazz,
+                    where: `${FQN}.CastDiscover`,
+                    method: 'find',
+                });
         }
+    }
+
+    find(name: CastName, required?: DevCallback|true): CastClass {
+        const clazz = this._find(name);
+        if (!clazz && required) {
+            const opt = (typeof required === 'function') ? required() : {};
+            const def = {
+                message: 'Class not found',
+                value: name,
+                type: typeof name,
+                where: `${FQN}.CastDiscover`,
+                method: 'find',
+            };
+            throw $dev.developerError2(FQN, 100, {...def, ...opt});
+        }
+        return clazz;
     }
 
     run(clazz: CastName, value: unknown): unknown {
@@ -79,15 +77,19 @@ export class CastDiscover implements CastDiscoverLike {
     }
 
     private findWithString(clazz: string): CastClass {
-        return this.build(this.pool.tokenizer.parse(clazz, true))?.value?.clazz;
+        return this.build(this.hub.tokenizer.parse(clazz, true))?.value?.clazz;
     }
 
     private findWithSystem(clazz: ClassLike): CastClass {
-        return this.build(this.pool.tokenizer.parse(clazz, true))?.value?.clazz;
+        return this.build(this.hub.tokenizer.parse(clazz, true))?.value?.clazz;
     }
 
     private findEmptyGenerics(clazz: ClassLike): CastClass {
-        return this.build({ base: this.pool.tokenizer.className(clazz), children: [{ base: 'Any' }] })?.value?.clazz;
+        return this.build({
+            base: this.hub.tokenizer.className(clazz),
+            kind: 'generics',
+            children: [{ base: 'Any', kind: 'basic' }],
+        })?.value?.clazz;
     }
 
     private findWithShortcutArray(clazz: CastNamePlain): CastClass {
@@ -97,8 +99,8 @@ export class CastDiscover implements CastDiscoverLike {
             case 'function':
                 return this.build({
                     base: 'Array',
-                    kind: 'basic',
-                    children: [{ base: this.pool.tokenizer.className(clazz) }],
+                    kind: 'generics',
+                    children: [{ base: this.hub.tokenizer.className(clazz) }],
                 })?.value?.clazz;
             default:
                 throw $dev.developerError2(FQN, 100, {
@@ -120,7 +122,7 @@ export class CastDiscover implements CastDiscoverLike {
             case 'string':
             case 'object':
             case 'function':
-                key = this.pool.tokenizer.className(keyClass);
+                key = this.hub.tokenizer.className(keyClass);
                 break;
             default:
                 throw $dev.developerError2(FQN, 100, {
@@ -136,7 +138,7 @@ export class CastDiscover implements CastDiscoverLike {
             case 'string':
             case 'object':
             case 'function':
-                value = this.pool.tokenizer.className(valueClass);
+                value = this.hub.tokenizer.className(valueClass);
                 break;
             default:
                 throw $dev.developerError2(FQN, 100, {
@@ -148,47 +150,37 @@ export class CastDiscover implements CastDiscoverLike {
                     method: 'findWithShortcutRecord',
                 });
         }
-        return this.build(this.pool.tokenizer.parse(`Record<${key},${value}>`))?.value?.clazz;
+        return this.build(this.hub.tokenizer.parse(`Record<${key},${value}>`))?.value?.clazz;
     }
 
     private findWithNative(clazz: CastClass): CastClass {
-        if (this.pool.depot.has(clazz)) {
+        if (this.hub.depot.has(clazz)) {
             return clazz;
         }
 
-        const status = this.pool.fetch.analyse(clazz);
-        switch (status) {
-            case 'basic-instance':
-            case 'basic-static':
-                const tokenized = this.pool.tokenizer.parse(clazz, true);
-                const base = this.pool.fetch.save(clazz, { tokenized });
-                base.value.tags.push('from-native');
-                return clazz;
-            default:
-                throw $dev.developerError2(FQN, 100, {
-                    message: 'Class is not a cast class',
-                    value: clazz,
-                    where: `${FQN}.CastDiscover`,
-                    field: 'status',
-                    status,
-                    method: 'find',
-                });
+        const classRef = reflectionPool.get(clazz);
+        if (classRef) {
+            this.hub.basic.fetch(classRef);
+            this.hub.basic.process(classRef);
+        } else {
+            this.hub.basic.addNative(clazz as Func);
         }
+        return clazz;
     }
 
     build(tokenized: CastTokenized): CastBase {
-        const base = this.pool.depot.get(this.pool.tokenizer.stringify(tokenized));
+        const base = this.hub.depot.get(this.hub.tokenizer.stringify(tokenized));
         if (base) {
             return base;
         }
         switch (tokenized.kind) {
             case 'generics':
-                return this.pool.generics.build(tokenized);
+                return this.hub.generics.build(tokenized);
             case 'union':
-                return this.pool.union.build(tokenized);
+                return this.hub.union.build(tokenized);
             case 'tuple':
-                return this.pool.tuple.build(tokenized);
+                return this.hub.tuple.build(tokenized);
         }
-        return this.pool.basic.build(tokenized);
+        return this.hub.basic.build(tokenized);
     }
 }

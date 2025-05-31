@@ -1,2 +1,2 @@
-export * from './cast-dto';
+export * from './cast-hub';
 export * from './index.types';

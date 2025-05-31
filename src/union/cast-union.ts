@@ -1,20 +1,34 @@
 import { $dev, $is, $log, Obj } from '@leyyo/common';
-import { fqnHandler, nameHandler, reflectionPool } from '@leyyo/core';
+import { ClassReflectionLike, fqnHandler, nameHandler, reflectionPool } from '@leyyo/core';
 
-import { CastBase, CastDocCallback, CastDocLambda, CastIsLambda, CastLambda, CastPoolLike } from '../pool';
-import { CastBasicType, CastClass, CastPriority, CastPriorityLevel } from '../basic';
+import { CastHubLike } from '../hub';
 import { FQN } from '../internal';
-import { CastTokenized } from '../tokenizer';
 
-import { CastUnionConfig, CastUnionLevel, CastUnionLike } from './index.types';
+import {
+    CastBase,
+    CastBasicType,
+    CastClass,
+    CastDocCallback,
+    CastDocLambda,
+    CastIsLambda,
+    CastLambda,
+    CastPriority,
+    CastPriorityLevel,
+    CastTag,
+    CastTokenized,
+    CastUnionLevel,
+} from '../shared';
+import { CastUnionConfig, CastUnionLike } from './index.types';
+import {AssignDto, AssignGenerics, AssignTuple, AssignType, AssignUnionOpt} from '../decorators';
 
 export class CastUnion implements CastUnionLike {
     private counter: number = 0;
     private readonly logger = $log.create(CastUnion);
 
-    constructor(protected pool: CastPoolLike) {}
+    constructor(private hub: CastHubLike) {}
 
-    protected addBasicType(base: CastBase, config: CastUnionConfig, field: CastBasicType): boolean {
+    // region private
+    private _addBasicType(base: CastBase, config: CastUnionConfig, field: CastBasicType): boolean {
         let childLevel: CastPriorityLevel;
         const clazz = base.value.clazz;
         if ($is.bareObject(clazz.priority)) {
@@ -43,14 +57,15 @@ export class CastUnion implements CastUnionLike {
         return true;
     }
 
-    protected runFirst(types: [CastClass, CastPriorityLevel], value: unknown): unknown {
+    private _runFirst(types: [CastClass, CastPriorityLevel], value: unknown): unknown {
         const clazz = types[0];
         return clazz.cast(value);
     }
 
-    protected newConfig(): CastUnionConfig {
+    private _newConfig(): CastUnionConfig {
         return {
-            is: [],
+            exact: [],
+            canBe: [],
             string: undefined,
             number: undefined,
             boolean: undefined,
@@ -71,7 +86,8 @@ export class CastUnion implements CastUnionLike {
                 any: new Map(),
             } as CastUnionLevel,
             newPriority: {
-                is: undefined,
+                canBe: undefined,
+                exact: undefined,
                 string: undefined,
                 number: undefined,
                 boolean: undefined,
@@ -84,18 +100,21 @@ export class CastUnion implements CastUnionLike {
         } as CastUnionConfig;
     }
 
-    protected buildIsLambda(classes: Array<CastClass>): CastIsLambda {
-        const isFuncList = classes.map((clazz) => (typeof clazz.is === 'function' ? clazz.is : (_v) => false));
-        return (value) => isFuncList.some((fn) => fn(value));
+    private _buildCanBeLambda(classes: Array<CastClass>): CastIsLambda {
+        return (value) => classes.some((clazz) => clazz.canBe(value));
     }
 
-    protected buildCastLambda(config: CastUnionConfig): CastLambda {
+    private _buildExactLambda(classes: Array<CastClass>): CastIsLambda {
+        return (value) => classes.some((clazz) => clazz.exact(value));
+    }
+
+    private _buildCastLambda(config: CastUnionConfig): CastLambda {
         return (value) => {
             if (!$is.empty(value)) {
                 return value;
             }
-            if (config.is) {
-                for (const [clazz, fn] of config.is) {
+            if (config.exact) {
+                for (const [clazz, fn] of config.exact) {
                     if (fn(value)) {
                         return clazz.cast(value);
                     }
@@ -128,41 +147,37 @@ export class CastUnion implements CastUnionLike {
                 }
 
                 if (config.array && $is.arrayLike(value)) {
-                    return this.runFirst(config.array, value);
+                    return this._runFirst(config.array, value);
                 }
             }
 
             if (config[type]) {
-                return this.runFirst(config[type], value);
+                return this._runFirst(config[type], value);
             }
             if (config.any) {
-                return this.runFirst(config.any, value);
+                return this._runFirst(config.any, value);
             }
             throw $dev.invalidError({ message: 'Unexpected union value', type, expected: config.expectedTypes });
         };
     }
 
-    protected buildDocLambda(clazz: CastClass, classes: Array<CastClass>): CastDocLambda {
+    private _buildDocLambda(clazz: CastClass, classes: Array<CastClass>): CastDocLambda {
         return (openApi: CastDocCallback) => openApi(clazz, { oneOf: [...classes.map((clazz) => clazz.doc(openApi))] });
     }
 
-    protected buildConfig(children: Array<CastBase>): CastUnionConfig {
-        const config = this.newConfig();
+    private _buildConfig(children: Array<CastBase>): CastUnionConfig {
+        const config = this._newConfig();
 
         children.forEach((child) => {
             const pri = child.value.clazz.priority;
             if ($is.bareObject(pri)) {
-                this.addBasicType(child, config, 'string');
-                this.addBasicType(child, config, 'number');
-                this.addBasicType(child, config, 'boolean');
-                this.addBasicType(child, config, 'bigint');
-                this.addBasicType(child, config, 'object');
-                this.addBasicType(child, config, 'array');
-                this.addBasicType(child, config, 'any');
-
-                if (typeof pri.is === 'function') {
-                    config.is.push([child.value.clazz, pri.is]);
-                }
+                this._addBasicType(child, config, 'string');
+                this._addBasicType(child, config, 'number');
+                this._addBasicType(child, config, 'boolean');
+                this._addBasicType(child, config, 'bigint');
+                this._addBasicType(child, config, 'object');
+                this._addBasicType(child, config, 'array');
+                this._addBasicType(child, config, 'any');
 
                 if (Array.isArray(pri.instance)) {
                     pri.instance.forEach(([clazz, level]) => {
@@ -170,6 +185,9 @@ export class CastUnion implements CastUnionLike {
                         config.newPriority.instance.push([clazz, level]);
                     });
                 }
+            }
+            if (!child.value.tags.includes('system')) {
+                config.exact.push([child.value.clazz, child.value.clazz.exact]);
             }
             if ($is.bareObject(child.value.discriminator)) {
                 config.discriminators.push([child.value.clazz, child.value.discriminator]);
@@ -195,9 +213,6 @@ export class CastUnion implements CastUnionLike {
         if (config.instance.length < 1) {
             delete config.instance;
         }
-        if (config.is.length < 1) {
-            delete config.is;
-        }
 
         for (const [basicType, map] of Object.entries(config.tempLevels)) {
             for (const [level, duplicatedClasses] of map.entries()) {
@@ -215,17 +230,77 @@ export class CastUnion implements CastUnionLike {
         return config;
     }
 
+    private _process(base: CastBase): CastBase {
+        const tokenized = base.value.tokenized;
+        const children = tokenized.children.map((child) => this.hub.discover.build(child));
+        const classes = children.map((child) => child.value.clazz);
+        const clazz = base.value.clazz;
+        const config = this._buildConfig(children);
+
+        if (!$is.bareObject(clazz.priority)) {
+            clazz.priority = config.newPriority;
+        }
+        if (typeof clazz.cast !== 'function') {
+            clazz.cast = this._buildCastLambda(config);
+        }
+        if (typeof clazz.exact !== 'function') {
+            clazz.exact = this._buildExactLambda(classes);
+        }
+        if (typeof clazz.canBe !== 'function') {
+            clazz.canBe = this._buildCanBeLambda(classes);
+        }
+        if (typeof clazz.doc !== 'function') {
+            clazz.doc = this._buildDocLambda(clazz, classes);
+        }
+
+        const ref = reflectionPool.registerClass(clazz);
+        classes.forEach((cls) => {
+            if (reflectionPool.isRegistered(cls)) {
+                ref.copyDecorators(reflectionPool.get(cls), [cls]);
+            }
+        });
+        return base;
+    }
+
+    // endregion private
+
+    fetch(classRef: ClassReflectionLike, opt: AssignUnionOpt): void {
+        this.hub.check.notDecoratedBy(classRef, AssignType, AssignDto, AssignGenerics, AssignTuple);
+        const clazz = classRef.creator as CastClass;
+        const tokenized = this.hub.tokenizer.parse(opt.pattern, true);
+        const encoded = this.hub.tokenizer.stringify(tokenized);
+
+        this.hub.check.checkDuplicated(clazz, encoded);
+
+        this.hub.check.save(clazz, { tokenized }).value.push('from-union');
+    }
+
+    process(classRef: ClassReflectionLike): void {
+        const clazz = classRef.creator as CastClass;
+
+        const base = this.hub.depot.get(clazz);
+        const tokenized = base.value.tokenized;
+        const children = tokenized.children.map((child) => this.hub.discover.build(child));
+        if (children.some((b) => !b)) {
+            if (!this.hub.pending.has(tokenized)) {
+                this.hub.pending.queue(tokenized, (_t) => this._process(base));
+            }
+            return;
+        }
+        this._process(base);
+    }
+
     build(tokenized: CastTokenized): CastBase {
-        const encoded = this.pool.tokenizer.stringify(tokenized);
-        let base = this.pool.depot.get(encoded);
+        const encoded = this.hub.tokenizer.stringify(tokenized);
+        let base = this.hub.depot.get(encoded);
         if (base) {
             return base;
         }
-        const children = tokenized.children.map((child) => this.pool.discover.build(child));
+        const children = tokenized.children.map((child) => this.hub.discover.build(child));
         let hasPending = false;
         if (children.some((c) => !c)) {
-            if (!this.pool.pending.has(tokenized)) {
-                this.pool.pending.queue(tokenized, (t) => this.build(t));
+            if (!this.hub.pending.has(tokenized)) {
+                this.hub.pending.queue(tokenized, (t) => this.build(t));
             }
             hasPending = true;
         }
@@ -234,14 +309,15 @@ export class CastUnion implements CastUnionLike {
         }
 
         const classes = children.map((child) => child.value.clazz);
-        const config = this.buildConfig(children);
+        const config = this._buildConfig(children);
 
         const clazz = class {} as CastClass;
 
         clazz.priority = config.newPriority;
-        clazz.is = this.buildIsLambda(classes);
-        clazz.cast = this.buildCastLambda(config);
-        clazz.doc = this.buildDocLambda(clazz, classes);
+        clazz.exact = this._buildExactLambda(classes);
+        clazz.canBe = this._buildCanBeLambda(classes);
+        clazz.cast = this._buildCastLambda(config);
+        clazz.doc = this._buildDocLambda(clazz, classes);
 
         const name = nameHandler.anonymous('Union', this.counter);
         nameHandler.set(clazz, name);
@@ -255,7 +331,7 @@ export class CastUnion implements CastUnionLike {
         });
         this.counter++;
 
-        base = this.pool.fetch.save(clazz, { tokenized });
+        base = this.hub.check.save(clazz, { tokenized });
 
         return base;
     }

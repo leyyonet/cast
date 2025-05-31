@@ -1,8 +1,9 @@
 import { $err, $is, ClassLike, DeveloperException, Dict, MultipleException } from '@leyyo/common';
-import { AssignType } from '../decorators';
 import { Fqn, fqnHandler } from '@leyyo/core';
+
+import { AssignType } from '../decorators';
 import { FQN } from '../internal';
-import { CastDocCallback, CastDocResponse } from '../pool';
+import { CastDocCallback, CastDocResponse } from '../shared';
 
 // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
 @AssignType()

@@ -1,7 +1,7 @@
 import { Fqn } from '@leyyo/core';
 import { Loader } from '@leyyo/injection';
 import { FQN } from './internal';
-import { castPool } from './pool';
+import { castPool } from './hub';
 import { $$castDecorators } from './decorators/internal.loader';
 import { $$castAbstracts } from './object/internal.loader';
 

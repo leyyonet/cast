@@ -1,18 +1,15 @@
 import { Fqn, fqnHandler } from '@leyyo/core';
-import { $assert, $descriptor, $dev, $log } from '@leyyo/common';
+import { $assert, $dev } from '@leyyo/common';
 import { FQN } from '../internal';
-import { CastToken, CastTokenized, CastTokenizedInside, CastTokenizerLike, CastTokenType } from './index.types';
-import { CastKind, CastNamePlain, CastPoolLike } from '../pool';
+import { CastTokenizerLike } from './index.types';
+import { CastHubLike } from '../hub';
 import { COMMA, GENERIC_BEGIN, GENERIC_END, PIPE, SPACE, TUPLE_BEGIN, TUPLE_END } from './index.constants';
-import { CastClass } from '../basic';
-import { CastTokenizedSign } from '../index.symbols';
+import { CastKind, CastNamePlain, CastToken, CastTokenized, CastTokenizedInside, CastTokenType } from '../shared';
 
 // noinspection Annotator
 @Fqn(FQN)
 export class CastTokenizer implements CastTokenizerLike {
-    private readonly logger = $log.create(CastTokenizer);
-
-    constructor(protected pool: CastPoolLike) {}
+    constructor(private hub: CastHubLike) {}
 
     protected _backward(value: string, tokens: Array<CastToken>, type?: CastTokenType): string {
         if (value) {
@@ -61,14 +58,6 @@ export class CastTokenizer implements CastTokenizerLike {
         }
         this._backward(collected, tokens);
         return tokens;
-    }
-
-    saveSign(clazz: CastClass, tokenized: CastTokenized): void {
-        $descriptor.save(clazz, CastTokenizedSign, tokenized);
-    }
-
-    getSign(clazz: CastClass): CastTokenized {
-        return $descriptor.getValue<CastTokenized>(clazz, CastTokenizedSign);
     }
 
     tokenize(text: string): CastTokenized {
@@ -253,7 +242,7 @@ export class CastTokenizer implements CastTokenizerLike {
         switch (typeof clazz) {
             case 'string':
                 const name = fqnHandler.normalizeName(clazz).split(' ').join('');
-                const base = this.pool.depot.get(name, false);
+                const base = this.hub.depot.get(name, false);
                 if (base) {
                     return base.full;
                 }
@@ -315,5 +304,3 @@ export class CastTokenizer implements CastTokenizerLike {
         return tokenized.base;
     }
 }
-
-// Array<Customer>

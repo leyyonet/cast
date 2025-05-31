@@ -1,19 +1,24 @@
 import { $is, $to, Dict } from '@leyyo/common';
 import { Fqn } from '@leyyo/core';
-import { AssignType, Cast, Dto } from '../decorators';
+import { AssignDto, AssignType, Cast, CastAlias } from '../decorators';
 import { FQN } from '../internal';
-import { CastDocCallback, CastDocResponse } from '../pool';
+import { CastDocCallback, CastDocResponse } from '../shared';
 
 // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
-@AssignType('Str2', 'str')
+@AssignType()
+@CastAlias('Str2', 'str')
 @Fqn(FQN)
 export class MyStr {
     static doc(openApi: CastDocCallback): Dict {
         return { type: 'string' };
     }
 
-    static is(value: unknown): boolean {
+    static canBe(value: unknown): boolean {
         return $is.text(value);
+    }
+
+    static exact(value: unknown): boolean {
+        return typeof value === 'string';
     }
 
     static cast(value: unknown): string {
@@ -22,11 +27,16 @@ export class MyStr {
 }
 
 // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
-@AssignType('int')
+@AssignType()
+@CastAlias('int')
 @Fqn(FQN)
 export class MyInt {
-    static is(value: unknown): boolean {
+    static exact(value: unknown): boolean {
         return $is.integer(value);
+    }
+
+    static canBe(value: unknown): boolean {
+        return typeof value === 'number';
     }
 
     static doc(openApi: CastDocCallback): CastDocResponse {
@@ -38,14 +48,14 @@ export class MyInt {
     }
 }
 
-@Dto()
+@AssignDto()
 @Fqn(FQN)
 export class MyClass0 {
     @Cast('Str2')
     surname: string;
 }
 
-@Dto()
+@AssignDto()
 @Fqn(FQN)
 export class MyClass extends MyClass0 {
     @Cast('MyStr')

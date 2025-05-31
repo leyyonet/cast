@@ -1,21 +1,32 @@
+import { ClassReflectionLike } from '@leyyo/core';
 import { ClassLike } from '@leyyo/common';
-import { CastBasicProp, CastClass, CastPriority, CastPriorityLambda, CastPriorityLevel } from '../basic';
-import { CastTokenized } from '../tokenizer';
-import { CastBase } from '../pool';
-import { DiscriminatorOpt } from '../decorators';
+import {
+    CastBase,
+    CastBasicProp,
+    CastClass,
+    CastIsLambda,
+    CastPriority,
+    CastPriorityLevel,
+    CastTag,
+    CastTokenized,
+    CastUnionLevel,
+} from '../shared';
+import { AssignDtoOpt, AssignUnionOpt } from '../decorators';
 
 export interface CastUnionLike {
+    fetch(classRef: ClassReflectionLike, opt: AssignUnionOpt): void;
+
+    process(classRef: ClassReflectionLike): void;
+
     build(tokenized: CastTokenized): CastBase;
 }
 
 export interface CastUnionConfig extends CastBasicProp<[CastClass, CastPriorityLevel]> {
-    is: Array<[CastClass, CastPriorityLambda]>;
+    exact: Array<[CastClass, CastIsLambda]>;
 
     instance: Array<[ClassLike, CastClass]>;
-    discriminators: Array<[CastClass, DiscriminatorOpt]>;
+    discriminators: Array<[CastClass, AssignDtoOpt]>;
     tempLevels: CastUnionLevel;
     newPriority: CastPriority;
     expectedTypes: Array<string>;
 }
-
-export type CastUnionLevel = CastBasicProp<Map<CastPriorityLevel, Array<CastClass>>>;

@@ -1,5 +1,5 @@
 import { MyClass } from './samples/z-cast-class';
-import { castPool } from './pool';
+import { castPool } from './hub';
 
 function sampleCast1() {
     console.log({ given: '5', current: castPool.discover.run('MyInt', '5'), expected: 5 });

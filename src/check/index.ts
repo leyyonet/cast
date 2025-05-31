@@ -1,2 +1,2 @@
-export * from './cast-pool';
+export * from './cast-check';
 export * from './index.types';

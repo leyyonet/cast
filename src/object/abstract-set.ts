@@ -1,7 +1,8 @@
-import { CastDocCallback, CastDocResponse } from '../pool';
-import { Fqn, fqnHandler } from '@leyyo/core';
-import { FQN } from '../internal';
 import { $err, $is, Arr, ClassLike, DeveloperException, Dict, MultipleException } from '@leyyo/common';
+import { Fqn, fqnHandler } from '@leyyo/core';
+
+import { CastDocCallback, CastDocResponse } from '../shared';
+import { FQN } from '../internal';
 
 // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
 @Fqn(FQN)

@@ -2,7 +2,7 @@ import { describe, test } from '@jest/globals';
 
 import { strict as assert } from 'assert';
 import { $test } from '@leyyo/common';
-import { castTokenizer } from './cast-pool';
+import { castTokenizer } from './cast-hub';
 
 describe('10* >> Application', () => {
     test($test.title(100, '[i] Simple'), () => {
