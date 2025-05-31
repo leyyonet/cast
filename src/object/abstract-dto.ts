@@ -3,33 +3,33 @@ import { Fqn } from '@leyyo/core';
 
 import { FQN } from '../internal';
 import { CastDocCallback, CastDocResponse } from '../shared';
-import { castPool } from '../hub';
+import { castHub } from '../hub';
 
 // noinspection TypeScriptAbstractClassConstructorCanBeMadeProtected,JSUnusedGlobalSymbols, JSUnusedLocalSymbols
 @Fqn(FQN)
 export class AbstractDto {
     constructor(...args: Arr) {
-        castPool.dto.onConstruct(this, ...args);
+        castHub.dto.onConstruct(this, ...args);
     }
 
     static doc(openApi: CastDocCallback): CastDocResponse {
-        return castPool.dto.onDoc(this, openApi);
+        return castHub.dto.onDoc(this, openApi);
     }
 
     static cast(value: unknown): unknown {
-        return castPool.dto.onCast(this, value);
+        return castHub.dto.onCast(this, value);
     }
 
     static canBe(value: unknown): boolean {
-        return castPool.dto.onCanBe(this, value);
+        return castHub.dto.onCanBe(this, value);
     }
 
     static exact(value: unknown): boolean {
-        return castPool.dto.onExact(this, value);
+        return castHub.dto.onExact(this, value);
     }
 
     toJSON(): Dict {
-        return castPool.dto.onJson(this, AbstractDto);
+        return castHub.dto.onJson(this, AbstractDto);
     }
 }
 

@@ -2,7 +2,7 @@ import { $assert, $dev, Arr, ClassLike, Func } from '@leyyo/common';
 import { FQN } from '../internal';
 import { decoratorPool, fqnHandler, nameHandler } from '@leyyo/core';
 import { CastClass } from '../shared';
-import { castPool } from '../hub';
+import { castHub } from '../hub';
 import { AssignDtoOpt } from './index.types';
 
 export function AssignDto(): ClassDecorator;
@@ -31,7 +31,7 @@ const id = decoratorPool
         const clazz = class extends ref.creator {
             constructor(...args: Arr) {
                 super(...args);
-                castPool.dto.onConstruct(this, ...args);
+                castHub.dto.onConstruct(this, ...args);
             }
         } as CastClass;
 
@@ -44,6 +44,6 @@ const id = decoratorPool
         }
 
         // sign proxy (build relation between old and new)
-        castPool.depot.appendPointer(clazz, ref.creator);
+        castHub.depot.appendPointer(clazz, ref.creator);
         return clazz;
     });

@@ -253,7 +253,7 @@ export class CastTokenizer implements CastTokenizerLike {
                     issue: 'invalid.generics.pattern',
                     type: typeof clazz,
                     expected: ['string', 'object', 'function'],
-                    where: 'leyyo.cast.CastPool',
+                    where: 'leyyo.cast.castHub',
                     method: 'findWithShortcutArray',
                 });
             case 'object':
@@ -264,7 +264,7 @@ export class CastTokenizer implements CastTokenizerLike {
                     issue: 'invalid.generics.pattern',
                     type: typeof clazz,
                     expected: ['string', 'object', 'function'],
-                    where: 'leyyo.cast.CastPool',
+                    where: 'leyyo.cast.castHub',
                     method: 'findWithShortcutArray',
                 });
         }

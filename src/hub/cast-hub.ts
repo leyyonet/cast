@@ -61,4 +61,4 @@ class CastHub implements CastHubLike {
     }
 }
 
-export const castPool: CastHubLike = new CastHub();
+export const castHub: CastHubLike = new CastHub();
