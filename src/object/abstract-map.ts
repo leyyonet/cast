@@ -1,12 +1,12 @@
 import { $err, $is, ClassLike, DeveloperException, Dict, MultipleException } from '@leyyo/common';
 import { Fqn, fqnHandler } from '@leyyo/core';
 
-import { AssignType } from '../decorators';
+import { CastBasic } from '../decorators';
 import { FQN } from '../internal';
-import { CastDocCallback, CastDocResponse } from '../shared';
+import { CastDocCallback, CastDocResponse } from '../hub';
 
 // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
-@AssignType()
+@CastBasic()
 @Fqn(FQN)
 export class AbstractMap<K = string, V = unknown> extends Map<K, V> {
     constructor(value?: unknown) {

@@ -1,0 +1,10 @@
+export const SPACE = ' ';
+export const COMMA = ',';
+export const PIPE = '|';
+export const AND = '|';
+export const GENERIC_BEGIN = '<';
+export const GENERIC_END = '>';
+export const TUPLE_BEGIN = '[';
+export const TUPLE_END = ']';
+export const GROUP_BEGIN = '(';
+export const GROUP_END = ')';

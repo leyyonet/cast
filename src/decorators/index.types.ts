@@ -1,4 +1,8 @@
-import { CastName } from '../shared';
+import { CastName } from '../hub';
+
+export interface AssignTypeOpt {
+    main?: string;
+}
 
 export interface CastAliasOpt {
     aliases: Array<string>;
@@ -15,6 +19,10 @@ export interface AssignGenericsOpt {
 }
 
 export interface AssignTupleOpt {
+    pattern: string;
+}
+
+export interface AssignMergeOpt {
     pattern: string;
 }
 

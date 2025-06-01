@@ -2,8 +2,7 @@ import { Arr, Dict } from '@leyyo/common';
 import { Fqn } from '@leyyo/core';
 
 import { FQN } from '../internal';
-import { CastDocCallback, CastDocResponse } from '../shared';
-import { castHub } from '../hub';
+import { CastDocCallback, CastDocResponse, castHub } from '../hub';
 
 // noinspection TypeScriptAbstractClassConstructorCanBeMadeProtected,JSUnusedGlobalSymbols, JSUnusedLocalSymbols
 @Fqn(FQN)

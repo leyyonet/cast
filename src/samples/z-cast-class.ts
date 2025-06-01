@@ -1,11 +1,12 @@
 import { $is, $to, Dict } from '@leyyo/common';
 import { Fqn } from '@leyyo/core';
-import { AssignDto, AssignType, Cast, CastAlias } from '../decorators';
+
+import { Cast, CastAlias, CastBasic, CastDto } from '../decorators';
 import { FQN } from '../internal';
-import { CastDocCallback, CastDocResponse } from '../shared';
+import { CastDocCallback, CastDocResponse } from '../hub';
 
 // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
-@AssignType()
+@CastBasic()
 @CastAlias('Str2', 'str')
 @Fqn(FQN)
 export class MyStr {
@@ -27,7 +28,7 @@ export class MyStr {
 }
 
 // noinspection JSUnusedGlobalSymbols,JSUnusedLocalSymbols
-@AssignType()
+@CastBasic()
 @CastAlias('int')
 @Fqn(FQN)
 export class MyInt {
@@ -48,14 +49,14 @@ export class MyInt {
     }
 }
 
-@AssignDto()
+@CastDto()
 @Fqn(FQN)
 export class MyClass0 {
     @Cast('Str2')
     surname: string;
 }
 
-@AssignDto()
+@CastDto()
 @Fqn(FQN)
 export class MyClass extends MyClass0 {
     @Cast('MyStr')

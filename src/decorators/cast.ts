@@ -1,9 +1,9 @@
 import { $assert, $dev, Func } from '@leyyo/common';
 import { decoratorPool } from '@leyyo/core';
 
-import { CastName } from '../shared';
 import { FQN } from '../internal';
 import { CastOpt } from './index.types';
+import { CastName } from '../hub';
 
 export function Cast(type: CastName, weak?: boolean): PropertyDecorator;
 export function Cast(type: CastName, weak?: boolean): ParameterDecorator;

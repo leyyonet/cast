@@ -1,19 +1,22 @@
-import { AssignGenerics } from './assign-generics';
-import { AssignTuple } from './assign-tuple';
-import { AssignType } from './assign-type';
-import { AssignUnion } from './assign-union';
+import { CastGenerics } from './cast-generics';
+import { CastTuple } from './cast-tuple';
+import { CastBasic } from './cast-basic';
+import { CastUnion } from './cast-union';
 import { Cast } from './cast';
-import { GenericsIndex } from './generics-index';
-import { AssignDto } from './assign-dto';
+import { CastIndex } from './cast-index';
+import { CastDto } from './cast-dto';
 import { CastAlias } from './cast-alias';
+import { CastMerge } from './cast-merge';
 
 export const $$castDecorators = [
-    AssignGenerics,
-    AssignTuple,
-    AssignType,
-    AssignUnion,
-    AssignDto,
+    CastDto,
+    CastGenerics,
+    CastMerge,
+
+    CastTuple,
+    CastBasic,
+    CastUnion,
     Cast,
     CastAlias,
-    GenericsIndex,
+    CastIndex,
 ];
