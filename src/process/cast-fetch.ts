@@ -10,9 +10,9 @@ export class CastFetch implements CastFetchLike {
     constructor(private hub: CastHubLike) {
         lifecycle
             .onAll(FQN)
-            .after('leyyo.rule')
-            .before('leyyo.http-api')
-            .before('leyyo.http-client')
+            .after('leyyo.ruler')
+            .before('leyyo.http_api')
+            .before('leyyo.http_client')
             .before('leyyo.validator')
             .before('leyyo.pipe')
             .before('leyyo.middleware');

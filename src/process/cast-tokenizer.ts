@@ -33,11 +33,13 @@ export class CastTokenizer implements CastTokenizerLike {
         'group-begin',
         'group-end',
     ] as Array<CastTokenType>;
-    private readonly _keys = ['clazz', 'main', 'kind', 'children', 'parent'] as Array<keyof CastTokenized>;
     private readonly _hasMain = ['basic', 'generics'] as Array<CastKind>;
     private readonly _noChild = ['basic'] as Array<CastKind>;
     private readonly _noOneChild = ['union', 'merge'] as Array<CastKind>;
+    private readonly _bracketChild = ['union', 'merge'] as Array<CastKind>;
     private readonly _onlyOneChild = ['group'] as Array<CastKind>;
+
+
     // endregion properties
 
     constructor(private hub: CastHubLike) {}
@@ -114,7 +116,17 @@ export class CastTokenizer implements CastTokenizerLike {
         return undefined;
     }
 
-    private _validate(tokenized: CastTokenized): void {
+    private _removeGroup(tokenized: CastTokenized): CastTokenized {
+        if (tokenized.children) {
+            tokenized.children = tokenized.children.map((token) => this._removeGroup(token));
+            if (tokenized.kind === 'group') {
+                return tokenized.children[0];
+            }
+        }
+        return tokenized;
+    }
+
+    private _validate(tokenized: CastTokenized): CastTokenized {
         const {main, kind, children} = tokenized;
         if (main && !this._hasMain.includes(kind)) {
             throw $dev.developerError2(FQN, 100, {message: 'Class can not have main'});
@@ -139,34 +151,48 @@ export class CastTokenizer implements CastTokenizerLike {
                     throw new Error('Class must have only 1 child');
                 }
             }
-            tokenized.children.map((token) => this._validate(token));
+            tokenized.children = tokenized.children.map((token) => this._validate(token));
         }
+        return tokenized;
     }
 
-    private _clear(tokenized: CastTokenized): void {
+    private _clear(tokenized: CastTokenized, sanitize: boolean): CastTokenized {
         if (tokenized.parent !== undefined) {
             delete tokenized.parent;
+        }
+        if (sanitize && tokenized.clazz !== undefined) {
+            delete tokenized.clazz;
         }
         if (Array.isArray(tokenized.children)) {
             if (tokenized.children.length < 1) {
                 delete tokenized.children;
             } else {
-                tokenized.children.map((token) => this._clear(token));
+                tokenized.children = tokenized.children.map((token) => this._clear(token, sanitize));
             }
         } else if (tokenized.children !== undefined) {
             delete tokenized.children;
         }
-        this._keys.forEach(key => {
-            const value = tokenized[key];
-            delete tokenized[key];
-            if (value !== undefined) {
-                tokenized[key as 'main'] = value as string;
-            }
-        })
+        const {kind, children, main, clazz} = tokenized;
+        const newToken = {kind} as CastTokenized;
+        if (main) {
+            newToken.main = main;
+        }
+        if (!sanitize && clazz) {
+            newToken.clazz = clazz;
+        }
+        if (children) {
+            newToken.children = children;
+        }
+        return newToken;
     }
 
-    private _stringify(children: Array<CastTokenized>, separator: string): string {
-        return children.map((child) => this.stringify(child)).join(separator);
+    private _stringifyChildren(children: Array<CastTokenized>, separator: string, bracket?: boolean): string {
+        return children.map((child) => {
+            if (bracket && this._bracketChild.includes(child.kind)) {
+                return `(${this._stringify(child)})`;
+            }
+            return this._stringify(child);
+        }).join(separator);
     }
     // endregion private
 
@@ -400,10 +426,7 @@ export class CastTokenizer implements CastTokenizerLike {
                     break;
             }
         });
-
-        this._clear(result);
-        this._validate(result);
-        return result;
+        return this._removeGroup(this._validate(this._clear(result, false)));
     }
 
     className(clazz: CastNamePlain): string {
@@ -449,9 +472,13 @@ export class CastTokenizer implements CastTokenizerLike {
         }
         if (
             text.includes('<') ||
+            text.includes('>') ||
             text.includes('[') ||
+            text.includes(']') ||
             text.includes('(') ||
+            text.includes(')') ||
             text.includes('|') ||
+            text.includes(',') ||
             text.includes('&')
         ) {
             return this.tokenize(text);
@@ -463,44 +490,27 @@ export class CastTokenizer implements CastTokenizerLike {
     }
 
     sanitize(given: CastTokenized): CastTokenized {
-        const tokenized = {...given};
-        if (tokenized.parent !== undefined) {
-            delete tokenized.parent;
+        return this._removeGroup(this._validate(this._clear(given, true)));
+    }
+    private _stringify(tokenized: CastTokenized): string {
+        switch (tokenized.kind) {
+            case 'basic':
+                return tokenized.main;
+            case 'generics':
+                return `${tokenized.main}<${this._stringifyChildren(tokenized.children, ', ')}>`;
+            case 'union':
+                return this._stringifyChildren(tokenized.children, ' | ', true);
+            case 'tuple':
+                return `[${this._stringifyChildren(tokenized.children, ', ')}]`;
+            case 'merge':
+                return this._stringifyChildren(tokenized.children, ' & ', true);
+            case 'group': // should be never called
+                return `(${this._stringify(tokenized.children[0])})`;
+            default:
+                return tokenized.main;
         }
-        if (tokenized.clazz !== undefined) {
-            delete tokenized.clazz;
-        }
-        if (Array.isArray(tokenized.children)) {
-            if (tokenized.children.length < 1) {
-                delete tokenized.children;
-            } else {
-                tokenized.children = tokenized.children.map((token) => this.sanitize(token));
-            }
-        } else if (tokenized.children !== undefined) {
-            delete tokenized.children;
-        }
-        this._keys.forEach(key => {
-            const value = tokenized[key];
-            delete tokenized[key];
-            if (value !== undefined) {
-                tokenized[key as 'main'] = value as string;
-            }
-        });
-        return tokenized;
     }
     stringify(tokenized: CastTokenized): string {
-        switch (tokenized.kind) {
-            case 'generics':
-                return `${tokenized.main}<${this._stringify(tokenized.children, ', ')}>`;
-            case 'union':
-                return this._stringify(tokenized.children, ' | ');
-            case 'tuple':
-                return `[${this._stringify(tokenized.children, ', ')}]`;
-            case 'group':
-                return `(${this.stringify(tokenized.children[0])}]`;
-            case 'merge':
-                return this._stringify(tokenized.children, ' & ');
-        }
-        return tokenized.main;
+        return this._stringify(this.sanitize(tokenized));
     }
 }

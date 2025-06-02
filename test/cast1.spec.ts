@@ -1,41 +1,42 @@
 import {strict as assert} from 'assert';
-import {castPool} from "../src";
+import {castHub} from "../src";
 import {MyClass} from "../src/samples/z-cast-class";
 
 describe('callback', () => {
     beforeEach(() => {
-        castPool.depot.$secure.$clearAll();
-        castPool.fetch.initialize();
+        castHub.depot.$secure.$clearAll();
+        castHub.fetch.initialize();
+        castHub.fetch.process();
     })
     describe('has', () => {
         it('fqn.full - source', () => {
-            assert.equal(castPool.depot.has('leyyo.cast.MyStr'), true);
+            assert.equal(castHub.depot.has('leyyo.cast.MyStr'), true);
         });
         it('fqn.basic - source', () => {
-            assert.equal(castPool.depot.has('MyStr'), true);
+            assert.equal(castHub.depot.has('MyStr'), true);
         });
         it('alias', () => {
-            assert.equal(castPool.depot.has('Str2'), true);
+            assert.equal(castHub.depot.has('Str2'), true);
         });
         it('alias', () => {
-            assert.equal(castPool.depot.has('str'), true);
+            assert.equal(castHub.depot.has('str'), true);
         });
         it('alias absent', () => {
-            assert.equal(castPool.depot.has('str22'), false);
+            assert.equal(castHub.depot.has('str22'), false);
         });
     });
     describe('type', () => {
         it('str to int', () => {
-            assert.equal(castPool.discover.run('MyInt', '5'), 5);
+            assert.equal(castHub.discover.run('MyInt', '5'), 5);
         });
         it('bool to int', () => {
-            assert.equal(castPool.discover.run('MyInt', true), 1);
+            assert.equal(castHub.discover.run('MyInt', true), 1);
         });
         it('float/str to int', () => {
-            assert.equal(castPool.discover.run('MyInt', '2.3'), 2);
+            assert.equal(castHub.discover.run('MyInt', '2.3'), 2);
         });
         it('float to int', () => {
-            assert.equal(castPool.discover.run('MyInt', 2.3), 2);
+            assert.equal(castHub.discover.run('MyInt', 2.3), 2);
         });
 
     });
