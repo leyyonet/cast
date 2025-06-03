@@ -1,41 +1,56 @@
 import { decoratorPool } from '@leyyo/core';
 import { FQN } from '../internal';
-import { $assert, $dev } from '@leyyo/common';
+import {$assert, $dev, Dict} from '@leyyo/common';
 import { AssignGenericsOpt } from './index.types';
 
-export function CastGenerics(min: number, max: number): ClassDecorator {
-    return (clazz) => id.process([clazz], { min, max });
+interface P {
+    v1: number;
+    v2: number;
+}
+export function CastGenerics(max: number): ClassDecorator;
+export function CastGenerics(min: number, max: number): ClassDecorator;
+export function CastGenerics(v1: number, v2?: number): ClassDecorator {
+    return (clazz) => id.process([clazz], { v1, v2 });
 }
 
 const id = decoratorPool
-    .newId<AssignGenericsOpt>(CastGenerics)
+    .newId<AssignGenericsOpt, Dict, P>(CastGenerics)
     .fqn(FQN)
     .targets('class')
     .rules('no-multiple', 'no-inherited', 'no-copy')
     .processor((ins, p) => {
-        $assert.integer(p.min, () => $dev.desc(ins, { field: 'min' }));
-        $assert.positiveInteger(p.max, () => $dev.desc(ins, { field: 'max' }));
-        if (p.min < 0) {
+        const opt = {} as AssignGenericsOpt;
+        if (p.v2 !== undefined) {
+            opt.min = p.v1;
+            opt.max = p.v2;
+        }
+        else {
+            opt.min = 0;
+            opt.max = p.v1;
+        }
+        $assert.integer(opt.min, () => $dev.desc(ins, { field: 'min' }));
+        $assert.positiveInteger(opt.max, () => $dev.desc(ins, { field: 'max' }));
+        if (opt.min < 0) {
             throw $dev.developerError2(FQN, 100, {
                 message: 'Invalid minimum arguments in generics, min: 0',
                 desc: ins.description,
-                min: p.min,
+                min: opt.min,
             });
         }
-        if (p.max > 10) {
+        if (opt.max > 10) {
             throw $dev.developerError2(FQN, 100, {
                 message: 'Arguments size exceeded in generics, max: 10',
                 desc: ins.description,
-                max: p.max,
+                max: opt.max,
             });
         }
-        if (p.min > p.max) {
+        if (opt.min > opt.max) {
             throw $dev.developerError2(FQN, 100, {
                 message: 'Invalid maximum arguments in generics, min > max',
                 desc: ins.description,
-                min: p.min,
-                max: p.max,
+                min: opt.min,
+                max: opt.max,
             });
         }
-        ins.set(p);
+        ins.set(opt);
     });

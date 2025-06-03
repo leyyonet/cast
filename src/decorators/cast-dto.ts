@@ -5,9 +5,6 @@ import { FQN } from '../internal';
 import { CastClass, castHub } from '../hub';
 import { AssignDtoOpt } from './index.types';
 
-export function CastDto(): ClassDecorator;
-export function CastDto(field: string): ClassDecorator;
-export function CastDto(field: string, values: Array<unknown>): ClassDecorator;
 export function CastDto(field?: string, values?: Array<unknown>): ClassDecorator {
     return <ClassDecorator>((clazz: Func) => id.process<ClassLike>([clazz], { field, values }));
 }

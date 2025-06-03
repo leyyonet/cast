@@ -5,9 +5,7 @@ import { FQN } from '../internal';
 import { CastOpt } from './index.types';
 import { CastName } from '../hub';
 
-export function Cast(type: CastName, weak?: boolean): PropertyDecorator;
-export function Cast(type: CastName, weak?: boolean): ParameterDecorator;
-export function Cast(type: CastName, weak: boolean = true): PropertyDecorator | ParameterDecorator {
+export function Cast(type: CastName, weak: boolean = true): PropertyDecorator & ParameterDecorator {
     return (target: Func, property: string, index?: number) => id.process([target, property, index], { type, weak });
 }
 

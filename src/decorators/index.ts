@@ -9,3 +9,4 @@ export * from './cast-tuple';
 export * from './cast-union';
 export * from './cast-alias';
 export * from './cast-index';
+export * from './cast-type';

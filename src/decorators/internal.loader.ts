@@ -7,6 +7,7 @@ import { CastIndex } from './cast-index';
 import { CastDto } from './cast-dto';
 import { CastAlias } from './cast-alias';
 import { CastMerge } from './cast-merge';
+import {CastType} from "./cast-type";
 
 export const $$castDecorators = [
     CastDto,
@@ -17,6 +18,7 @@ export const $$castDecorators = [
     CastBasic,
     CastUnion,
     Cast,
+    CastType,
     CastAlias,
     CastIndex,
 ];

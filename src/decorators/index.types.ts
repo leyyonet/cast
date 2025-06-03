@@ -1,4 +1,5 @@
 import { CastName } from '../hub';
+import {ClassLike, Func} from "../../../common/src";
 
 export interface AssignTypeOpt {
     main?: string;
@@ -38,4 +39,8 @@ export interface CastOpt {
 export interface GenericsIndexOpt {
     index: number;
     def?: CastName;
+}
+export interface CastTypeOpt {
+    type: Func|ClassLike;
+    isAsync: boolean;
 }
