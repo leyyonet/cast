@@ -11,12 +11,12 @@ export function CastType(type: Func|ClassLike, isAsync?: boolean): MethodDecorat
 const id = decoratorPool
     .newId<CastTypeOpt>(CastType)
     .fqn(FQN)
-    .targets('field', 'parameter', 'method')
-    .rules('no-multiple')
+    .targets('field', 'parameter', 'method', 'class') // todo
+    .rules('no-multiple', 'no-copy')
     .processor((ins, p) => {
         $assert.func(p.type, () => $dev.desc(ins, { field: 'type' }));
         $assert.booleanOptional(p.isAsync, () => $dev.desc(ins, { field: 'isAsync' }));
-        
+
         switch (ins.target) {
             case 'parameter':
                 ins.asParameter.$secure.$setType(p.type as Func);

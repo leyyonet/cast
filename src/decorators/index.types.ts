@@ -1,5 +1,5 @@
+import {ClassLike, Func} from "@leyyo/common";
 import { CastName } from '../hub';
-import {ClassLike, Func} from "../../../common/src";
 
 export interface AssignTypeOpt {
     main?: string;
