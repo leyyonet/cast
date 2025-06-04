@@ -1,4 +1,3 @@
-import {ClassLike, Func} from "@leyyo/common";
 import { CastName } from '../hub';
 
 export interface AssignTypeOpt {
@@ -39,8 +38,4 @@ export interface CastOpt {
 export interface GenericsIndexOpt {
     index: number;
     def?: CastName;
-}
-export interface CastTypeOpt {
-    type: Func|ClassLike;
-    isAsync: boolean;
 }
